@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-trend-analysis"
+version = "0.0.1"
+description = "Small package for analyzing agent trends (demo)"
+authors = ["<your name> <you@example.com>"]
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.8"
+
+[project.dependencies]
+numpy = "^1.26"
+
+[tool.setuptools.packages.find]
+where = ["src"]
