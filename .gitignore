@@ -25,6 +25,7 @@ var/
 
 # Virtual environment
 venv/
+.venv/
 .env
 .env.bak
 
@@ -36,3 +37,4 @@ venv/
 
 # macOS
 .DS_Store
+node_modules
