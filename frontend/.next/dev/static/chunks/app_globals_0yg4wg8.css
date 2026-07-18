@@ -1,0 +1,12 @@
+/* [project]/app/globals.css [app-client] (css) */
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/*# sourceMappingURL=app_globals_0yg4wg8.css.map*/

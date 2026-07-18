@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 10, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/james/project26/p_agent/agent_issue_tracking/frontend/app/page.tsx"],"sourcesContent":["export default function Home() {\r\n  return (\r\n    <main style={{ display: \"flex\", flexDirection: \"column\", alignItems: \"center\", justifyContent: \"center\", minHeight: \"100vh\", gap: \"1rem\" }}>\r\n      <h1>Next.js Frontend</h1>\r\n      <p>FastAPI backend is ready in the backend folder.</p>\r\n    </main>\r\n  );\r\n}\r\n"],"names":["Home","style","display","flexDirection","alignItems","justifyContent","minHeight","gap"],"mappings":";;;;;;AAAe,SAASA;IACtB,qBACE,8OAAC;QAAKC,OAAO;YAAEC,SAAS;YAAQC,eAAe;YAAUC,YAAY;YAAUC,gBAAgB;YAAUC,WAAW;YAASC,KAAK;QAAO;;0BACvI,8OAAC;0BAAG;;;;;;0BACJ,8OAAC;0BAAE;;;;;;;;;;;;AAGT"}}]
+}
