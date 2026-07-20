@@ -15,6 +15,13 @@ type Issue = {
   summary: string;
 };
 
+type ResearchResponse = {
+  topic: string;
+  status: string;
+  summary: string;
+  sources: string[];
+};
+
 const getApiBaseUrl = () => {
   if (typeof window === "undefined") {
     return "/api";
@@ -30,6 +37,9 @@ export default function Home() {
   const [summary, setSummary] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [researchTopic, setResearchTopic] = useState("");
+  const [researchResult, setResearchResult] = useState<ResearchResponse | null>(null);
+  const [researchLoading, setResearchLoading] = useState(false);
 
   const apiBaseUrl = useMemo(() => getApiBaseUrl(), []);
 
@@ -93,6 +103,36 @@ export default function Home() {
     }
   };
 
+  const handleResearch = async () => {
+    if (!researchTopic.trim()) {
+      setError("Please enter a topic");
+      return;
+    }
+
+    setResearchLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/agent/research`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: researchTopic }),
+      });
+
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({}));
+        throw new Error(detail.detail || "Failed to generate research draft");
+      }
+
+      const data = await response.json();
+      setResearchResult(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unexpected error");
+    } finally {
+      setResearchLoading(false);
+    }
+  };
+
   return (
     <main style={{ minHeight: "100vh", padding: "1rem", fontFamily: "sans-serif" }}>
       <nav style={{ display: "flex", gap: "1rem", marginBottom: "2rem" }}>
@@ -143,6 +183,27 @@ export default function Home() {
               {loading ? "Creating..." : "Create issue"}
             </button>
           </form>
+        </section>
+
+        <section style={{ border: "1px solid #ddd", borderRadius: "8px", padding: "1rem" }}>
+          <h2 style={{ marginTop: 0 }}>Research draft</h2>
+          <input
+            value={researchTopic}
+            onChange={(event) => setResearchTopic(event.target.value)}
+            placeholder="Enter a topic"
+            style={{ padding: "0.6rem", width: "100%", marginBottom: "0.75rem" }}
+          />
+          <button onClick={() => { void handleResearch(); }} disabled={researchLoading}>
+            {researchLoading ? "Generating..." : "Generate research draft"}
+          </button>
+
+          {researchResult ? (
+            <div style={{ marginTop: "1rem" }}>
+              <p><strong>Topic:</strong> {researchResult.topic}</p>
+              <p><strong>Status:</strong> {researchResult.status}</p>
+              <p>{researchResult.summary}</p>
+            </div>
+          ) : null}
         </section>
 
         <section style={{ border: "1px solid #ddd", borderRadius: "8px", padding: "1rem" }}>
