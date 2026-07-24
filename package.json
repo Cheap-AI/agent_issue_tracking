@@ -2,24 +2,25 @@
   "name": "issue-tracking-monorepo",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n frontend,backend -c blue,green \"next dev\" \"python -m uvicorn api.index:app --host 127.0.0.1 --port 8000 --reload\"",
+    "dev": "concurrently -n frontend,backend -c blue,green \"next dev\" \"python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload\"",
     "dev:frontend": "next dev",
-    "dev:backend": "python -m uvicorn api.index:app --host 127.0.0.1 --port 8000 --reload",
+    "dev:backend": "python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload",
     "build": "next build",
     "start": "next start"
   },
   "dependencies": {
+    "framer-motion": "^12.42.2",
     "next": "^16.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "concurrently": "^8.0.0",
-    "typescript": "^5.6.3",
+    "@types/node": "^20.14.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@types/node": "^20.14.2",
+    "concurrently": "^8.0.0",
     "eslint": "^10.5.0",
-    "eslint-config-next": "^16.2.0"
+    "eslint-config-next": "^16.2.0",
+    "typescript": "^5.6.3"
   }
 }

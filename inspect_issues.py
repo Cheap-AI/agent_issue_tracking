@@ -1,25 +1,16 @@
-import sqlite3
-from pathlib import Path
+from backend.core.issue import list_issues
 
 
 def main() -> None:
-    db_path = Path("issues.db")
-    if not db_path.exists():
-        print("No issues database found at issues.db")
-        return
-
-    conn = sqlite3.connect(db_path)
-    rows = conn.execute("SELECT id, title, summary FROM issues ORDER BY id").fetchall()
-    conn.close()
-
-    if not rows:
+    issues = list_issues()
+    if not issues:
         print("No issues found.")
         return
 
-    for row in rows:
-        print(f"ID: {row[0]}")
-        print(f"Title: {row[1]}")
-        print(f"Summary: {row[2]}")
+    for issue in issues:
+        print(f"ID: {issue['id']}")
+        print(f"Title: {issue['title']}")
+        print(f"Summary: {issue['summary']}")
         print("-" * 40)
 
 

@@ -10,7 +10,7 @@ type HealthResponse = {
 };
 
 type Issue = {
-  id: number;
+  id: string;
   title: string;
   summary: string;
 };
