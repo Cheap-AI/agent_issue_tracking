@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 10, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/james/project26/p_agent/agent_issue_tracking/frontend/app/about/page.tsx"],"sourcesContent":["import Link from \"next/link\";\r\n\r\nexport default function AboutPage() {\r\n  return (\r\n    <main style={{ minHeight: \"100vh\", padding: \"1rem\" }}>\r\n      <nav style={{ display: \"flex\", gap: \"1rem\", marginBottom: \"2rem\" }}>\r\n        <Link href=\"/\">Home</Link>\r\n        <Link href=\"/about\">About</Link>\r\n      </nav>\r\n\r\n      <div style={{ maxWidth: \"500px\", margin: \"0 auto\" }}>\r\n        <h1>About Page</h1>\r\n        <p>This is a second page to show navigation in Next.js.</p>\r\n      </div>\r\n    </main>\r\n  );\r\n}\r\n"],"names":["AboutPage","style","minHeight","padding","display","gap","marginBottom","href","maxWidth","margin"],"mappings":";;;;;AAAA;;;AAEe,SAASA;IACtB,qBACE,8OAAC;QAAKC,OAAO;YAAEC,WAAW;YAASC,SAAS;QAAO;;0BACjD,8OAAC;gBAAIF,OAAO;oBAAEG,SAAS;oBAAQC,KAAK;oBAAQC,cAAc;gBAAO;;kCAC/D,8OAAC,0LAAI;wBAACC,MAAK;kCAAI;;;;;;kCACf,8OAAC,0LAAI;wBAACA,MAAK;kCAAS;;;;;;;;;;;;0BAGtB,8OAAC;gBAAIN,OAAO;oBAAEO,UAAU;oBAASC,QAAQ;gBAAS;;kCAChD,8OAAC;kCAAG;;;;;;kCACJ,8OAAC;kCAAE;;;;;;;;;;;;;;;;;;AAIX"}}]
-}

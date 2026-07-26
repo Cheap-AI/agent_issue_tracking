@@ -1,48 +1,65 @@
-import re
-from pathlib import Path
+"""Versioned knowledge component storage backed by Postgres (Supabase).
 
-from backend.core.issue import issue_dir
+Replaces the previous file-based storage (v001.md, v002.md, ... per component folder).
+Concurrency-safe: uses a Postgres advisory lock scoped to (issue_id, component) so
+concurrent writers can't race on the next version number.
+"""
+from sqlalchemy import func, select, text
 
-_VERSION_RE = re.compile(r"^v(\d+)\.md$")
+from backend.core.db import get_session
+from backend.models.db_models import Component
 
 
-def _component_dir(issue_id: str, component: str) -> Path:
-    return issue_dir(issue_id) / component
-
-
-def _existing_versions(issue_id: str, component: str) -> list[int]:
-    comp_dir = _component_dir(issue_id, component)
-    if not comp_dir.exists():
-        return []
-    versions = []
-    for path in comp_dir.iterdir():
-        match = _VERSION_RE.match(path.name)
-        if match:
-            versions.append(int(match.group(1)))
-    return sorted(versions)
+def _advisory_lock_key(issue_id: str, component: str) -> str:
+    return f"{issue_id}:{component}"
 
 
 def save_version(issue_id: str, component: str, content: str) -> int:
     """Write `content` as the next immutable version of a component. Returns the new version number."""
-    comp_dir = _component_dir(issue_id, component)
-    comp_dir.mkdir(parents=True, exist_ok=True)
-    versions = _existing_versions(issue_id, component)
-    next_version = (versions[-1] if versions else 0) + 1
-    version_path = comp_dir / f"v{next_version:03d}.md"
-    version_path.write_text(content, encoding="utf-8")
-    return next_version
+    with get_session() as session:
+        session.execute(
+            text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
+            {"key": _advisory_lock_key(issue_id, component)},
+        )
+        current_max = session.execute(
+            select(func.max(Component.version)).where(
+                Component.issue_id == issue_id, Component.component_type == component
+            )
+        ).scalar_one_or_none()
+        next_version = (current_max or 0) + 1
+
+        session.add(
+            Component(
+                issue_id=issue_id,
+                component_type=component,
+                version=next_version,
+                content=content,
+            )
+        )
+        return next_version
 
 
 def get_current_version(issue_id: str, component: str) -> tuple[int, str] | None:
     """Return (version_number, content) for the latest version of a component, or None if none exist."""
-    versions = _existing_versions(issue_id, component)
-    if not versions:
-        return None
-    latest = versions[-1]
-    content = (_component_dir(issue_id, component) / f"v{latest:03d}.md").read_text(encoding="utf-8")
-    return latest, content
+    with get_session() as session:
+        row = session.execute(
+            select(Component.version, Component.content)
+            .where(Component.issue_id == issue_id, Component.component_type == component)
+            .order_by(Component.version.desc())
+            .limit(1)
+        ).first()
+        if row is None:
+            return None
+        return row.version, row.content
 
 
 def list_versions(issue_id: str, component: str) -> list[int]:
     """Return all existing version numbers for a component, ascending."""
-    return _existing_versions(issue_id, component)
+    with get_session() as session:
+        versions = session.execute(
+            select(Component.version)
+            .where(Component.issue_id == issue_id, Component.component_type == component)
+            .order_by(Component.version.asc())
+        ).scalars().all()
+        return list(versions)
+

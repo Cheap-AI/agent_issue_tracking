@@ -1,12 +1,13 @@
 from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.core.issue import create_issue as create_issue_in_db, get_issue, list_issues
 from backend.models.schemas import AgentRequest, IssueCreateRequest
 from backend.services import search_service
-
-load_dotenv()
 
 # FastAPI 앱을 생성합니다.
 app = FastAPI(title="Issue Tracking API")  # python -m uvicorn backend.main:app --reload

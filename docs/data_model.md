@@ -1,49 +1,43 @@
 # Data Model and Storage Architecture
 
-This document describes the current data model and storage structure following the removal of SQLite/SQLAlchemy in favor of a fully file-based system.
+This document describes the current data model following the migration from file-based storage to Supabase Postgres.
 
 ## 1. Storage Overview
 
-All application data is stored under the `storage/` directory.
+All application data lives in a Supabase Postgres database, accessed via SQLAlchemy from `backend/core/`.
 
 ```
-storage/
-  global/                 - Shared framework documents
-  issues/                 - Folder per tracked issue
-    iss-0001/             - Unique Issue ID
-      meta.json           - Issue metadata (title, summary, status)
-      research/           - Versioned research markdown files
-      summary/            - Versioned summary markdown files
-      timeline/           - Versioned timeline events
-      sources/            - Versioned source lists
-      questions/          - Versioned open questions
+issues            - One row per tracked issue (id, title, summary, is_active, created_at)
+components        - Versioned knowledge rows (issue_id, component_type, version, content, created_at)
+                    component_type in: research, summary, timeline, sources, questions
+global_docs       - Shared framework documents (name, content, updated_at)
+                    name in: rubric, ranking, taxonomy
 ```
 
-## 2. Issue Metadata (`meta.json`)
+## 2. Issue Metadata (`issues` table)
 
-Stored at `storage/issues/<id>/meta.json`.
-
-| Field | Type | Description |
+| Column | Type | Description |
 | :--- | :--- | :--- |
-| `id` | `string` | Sequential ID, e.g., `"iss-0001"`. |
-| `title` | `string` | The macro issue title. |
-| `summary` | `string` | The latest high-level executive summary. |
+| `id` | `text` (PK) | Sequential ID, e.g., `"iss-0001"`, generated from the `issue_id_seq` Postgres sequence. |
+| `title` | `text` | The macro issue title. |
+| `summary` | `text` | The latest high-level executive summary. |
 | `is_active` | `boolean` | Whether the issue is currently being tracked/ranked. |
-| `created_at` | `iso8601` | Timestamp of initial discovery. |
+| `created_at` | `timestamptz` | Timestamp of initial discovery. |
 
-## 3. Versioned Components
+## 3. Versioned Components (`components` table)
 
-Each component folder (e.g., `research/`, `summary/`) contains immutable, sequential markdown files:
-- `v001.md`, `v002.md`, `v003.md`...
-- The **"current"** state of a component is always the file with the highest version number.
-- History is preserved indefinitely.
+Each row is an immutable version of a knowledge component (`research`, `summary`, `timeline`, `sources`, `questions`):
+- Unique on `(issue_id, component_type, version)`.
+- The **"current"** state of a component is always the row with the highest `version` for that `(issue_id, component_type)`.
+- History is preserved indefinitely (no updates/deletes, only inserts).
+- Next version numbers are computed under a Postgres advisory lock (`pg_advisory_xact_lock`) to avoid race conditions between concurrent writers.
 
-## 4. Global Knowledge
+## 4. Global Knowledge (`global_docs` table)
 
-Shared across the platform to define how agents think and rank.
-- `storage/global/ranking.md`: Scoring formulas and weighting.
-- `storage/global/rubric.md`: Evaluation dimensions (severity, impact, recency, etc.).
-- `storage/global/taxonomy.md`: Categorization labels.
+Shared across the platform to define how agents think and rank. One row per name, upserted in place (not versioned):
+- `rubric`: Evaluation dimensions (severity, impact, recency, etc.).
+- `ranking`: Scoring formulas and weighting.
+- `taxonomy`: Categorization labels.
 
 ## 5. API Schemas (Pydantic)
 
@@ -51,3 +45,4 @@ Located in `backend/models/schemas.py`. These define the request/response shapes
 
 - `IssueCreateRequest`: `{ title: str, summary: str }`
 - `AgentRequest`: `{ topic: str }`
+

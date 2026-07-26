@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 1, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/james/project26/p_agent/agent_issue_tracking/frontend/app/globals.css"],"sourcesContent":["html,\r\nbody {\r\n  padding: 0;\r\n  margin: 0;\r\n  font-family: system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;\r\n}\r\n\r\n* {\r\n  box-sizing: border-box;\r\n}\r\n"],"names":[],"mappings":"AAAA;;;;;;AAOA"}}]
-}
