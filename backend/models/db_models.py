@@ -3,16 +3,22 @@
 Tables:
 - issues: issue metadata (replaces meta.json files)
 - components: versioned knowledge components (replaces v001.md, v002.md, ... files)
+- component_embeddings: vector embeddings for RAG semantic search
+- events: discrete timeline events with dates
+- tracked_issues: curated top-N issues leaderboard
 - global_docs: shared rubric/ranking/taxonomy documents (replaces storage/global/*.md)
 """
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
+    Float,
     ForeignKey,
+    JSON,
     Sequence,
     String,
     Text,
@@ -43,6 +49,15 @@ class Issue(Base):
     components: Mapped[list["Component"]] = relationship(
         back_populates="issue", cascade="all, delete-orphan"
     )
+    events: Mapped[list["Event"]] = relationship(
+        back_populates="issue", cascade="all, delete-orphan"
+    )
+    embeddings: Mapped[list["ComponentEmbedding"]] = relationship(
+        back_populates="issue", cascade="all, delete-orphan"
+    )
+    tracked_issue: Mapped["TrackedIssue"] = relationship(
+        back_populates="issue", uselist=False, cascade="all, delete-orphan"
+    )
 
 
 class Component(Base):
@@ -65,6 +80,12 @@ class Component(Base):
     )
 
     issue: Mapped["Issue"] = relationship(back_populates="components")
+    embeddings: Mapped[list["ComponentEmbedding"]] = relationship(
+        back_populates="component", cascade="all, delete-orphan"
+    )
+    events: Mapped[list["Event"]] = relationship(
+        back_populates="component", cascade="all, delete-orphan"
+    )
 
 
 class GlobalDoc(Base):
@@ -75,3 +96,81 @@ class GlobalDoc(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
+
+
+class ComponentEmbedding(Base):
+    """Vector embeddings for semantic search via pgvector.
+    
+    Each row represents one chunk of a component version.
+    Embeddings are generated using OpenAI text-embedding-3-small (1536 dimensions).
+    """
+    __tablename__ = "component_embeddings"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    component_id: Mapped[int] = mapped_column(ForeignKey("components.id", ondelete="CASCADE"), nullable=False)
+    issue_id: Mapped[str] = mapped_column(ForeignKey("issues.id", ondelete="CASCADE"), nullable=False)
+    component_type: Mapped[str] = mapped_column(Text, nullable=False)
+    version: Mapped[int] = mapped_column(nullable=False)
+    chunk_index: Mapped[int] = mapped_column(nullable=False)
+    chunk_text: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[str] = mapped_column(Text, nullable=False)  # Stored as text, cast to vector(1536) in queries
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    component: Mapped["Component"] = relationship(back_populates="embeddings")
+    issue: Mapped["Issue"] = relationship(back_populates="embeddings")
+
+
+class Event(Base):
+    """Discrete timeline events associated with issues.
+    
+    Tracks when events happened (event_date) vs when we learned about them (discovered_at).
+    Can be manually created or extracted by agents from component updates.
+    """
+    __tablename__ = "events"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    issue_id: Mapped[str] = mapped_column(ForeignKey("issues.id", ondelete="CASCADE"), nullable=False)
+    event_date: Mapped[date | None] = mapped_column(Date, nullable=True)  # Nullable if date unknown
+    discovered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    source_urls: Mapped[list] = mapped_column(JSON, nullable=False, server_default="[]")
+    component_id: Mapped[int | None] = mapped_column(
+        ForeignKey("components.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    issue: Mapped["Issue"] = relationship(back_populates="events")
+    component: Mapped["Component"] = relationship(back_populates="events")
+
+
+class TrackedIssue(Base):
+    """Curated top-N issues leaderboard.
+    
+    Managed by the curation agent. Issues are scored on multiple dimensions
+    (severity, impact, scale, recency) and ranked. Top N are kept active.
+    """
+    __tablename__ = "tracked_issues"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    issue_id: Mapped[str] = mapped_column(
+        ForeignKey("issues.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    dimension_scores: Mapped[dict] = mapped_column(JSON, nullable=False)
+    # Example: {"severity": 8, "impact": 7, "scale": 9, "recency": 6}
+    overall_score: Mapped[float] = mapped_column(Float, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    first_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    last_updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    issue: Mapped["Issue"] = relationship(back_populates="tracked_issue")

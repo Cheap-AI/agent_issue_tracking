@@ -1,13 +1,73 @@
 from backend.core import versioning
+from backend.core.db import get_session
 from backend.core.issue import COMPONENTS
+from backend.models.db_models import Component, ComponentEmbedding
+from backend.services.chunking import chunk_text
+from backend.services.embedding import generate_embeddings_batch
 
 
 def update_component(issue_id: str, component: str, new_content: str) -> int:
     """Save new_content as the next immutable version of a knowledge component
-    (research/summary/timeline/sources/questions). Returns the new version number."""
+    (research/summary/timeline/sources/questions). Returns the new version number.
+    
+    Also generates and stores embeddings for the new content.
+    """
     if component not in COMPONENTS:
         raise ValueError(f"Unknown component '{component}', expected one of {COMPONENTS}")
-    return versioning.save_version(issue_id, component, new_content)
+    
+    version = versioning.save_version(issue_id, component, new_content)
+    
+    # Generate embeddings asynchronously after save
+    _generate_embeddings_for_component(issue_id, component, version, new_content)
+    
+    return version
+
+
+def _generate_embeddings_for_component(
+    issue_id: str, component_type: str, version: int, content: str
+) -> None:
+    """Generate and store embeddings for a component version.
+    
+    Chunks the content and generates embeddings for all chunks in a single batch API call.
+    """
+    # Chunk the content
+    chunks = chunk_text(content)
+    
+    if not chunks:
+        return  # No content to embed
+    
+    # Generate embeddings in batch (more efficient than one-by-one)
+    embeddings = generate_embeddings_batch(chunks)
+    
+    # Store embeddings in database
+    with get_session() as session:
+        # Get the component ID
+        component_obj = session.query(Component).filter_by(
+            issue_id=issue_id,
+            component_type=component_type,
+            version=version
+        ).first()
+        
+        if not component_obj:
+            raise ValueError(f"Component not found: {issue_id}/{component_type}/v{version}")
+        
+        # Create embedding records
+        for chunk_index, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+            # Convert embedding list to PostgreSQL array string format
+            embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
+            
+            emb_obj = ComponentEmbedding(
+                component_id=component_obj.id,
+                issue_id=issue_id,
+                component_type=component_type,
+                version=version,
+                chunk_index=chunk_index,
+                chunk_text=chunk,
+                embedding=embedding_str
+            )
+            session.add(emb_obj)
+        
+        session.commit()
 
 
 def read_current(issue_id: str, component: str) -> tuple[int, str] | None:

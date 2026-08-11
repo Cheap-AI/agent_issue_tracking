@@ -1,0 +1,1 @@
+Would you like to just talk through how to explain your favorite project from your resume? Or would you prefer to look at two simple Python optimization tricks that always impress hiring managers? Let's take it one small step at a time.
