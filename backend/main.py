@@ -16,7 +16,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-from backend.core.issue import create_issue as create_issue_in_db, get_issue, list_issues, delete_issue as delete_issue_db
+from backend.core.issue import create_issue as create_issue_in_db, get_issue, list_issues, delete_issue as delete_issue_db, list_events_for_issue
 from backend.core.knowledge import update_component
 from backend.core.db import get_db
 from backend.models.schemas import AgentRequest, DiscoveryRequest, IssueCreateRequest, UpdateComponentRequest
@@ -179,6 +179,17 @@ def trigger_research_workflow(
         "status": "workflow started",
         "message": "Research → Summary → Ranking agents running in background"
     }
+
+
+@app.get("/api/issues/{issue_id}/events")
+def get_issue_events(issue_id: str, session: Session = Depends(get_db)) -> dict[str, object]:
+    """Get events for an issue in chronological order (oldest first)."""
+    issue = get_issue(issue_id, session=session)
+    if issue is None:
+        raise HTTPException(status_code=404, detail="Issue not found")
+
+    events = list_events_for_issue(issue_id, session=session)
+    return {"issue_id": issue_id, "events": events, "count": len(events)}
 
 
 @app.post("/api/issues/{issue_id}/events")

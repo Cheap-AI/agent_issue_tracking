@@ -2,11 +2,11 @@
   "name": "issue-tracking-monorepo",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n frontend,backend -c blue,green \"next dev\" \"python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload\"",
-    "dev:frontend": "next dev",
+    "dev": "concurrently -n frontend,backend -c blue,green \"cd frontend && next dev\" \"python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload\"",
+    "dev:frontend": "cd frontend && next dev",
     "dev:backend": "python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload",
-    "build": "next build",
-    "start": "next start"
+    "build": "cd frontend && next build",
+    "start": "cd frontend && next start"
   },
   "dependencies": {
     "clsx": "^2.1.1",
