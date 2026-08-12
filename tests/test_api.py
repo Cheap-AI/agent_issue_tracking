@@ -1,7 +1,4 @@
-import os
-import tempfile
 import unittest
-from pathlib import Path
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -12,16 +9,8 @@ from backend.core.issue import create_issue
 
 class ApiTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temp_dir = tempfile.TemporaryDirectory()
-        os.environ["STORAGE_ROOT"] = str(Path(self.temp_dir.name) / "storage")
         create_issue("Seed issue", "A starter issue for testing.")
         self.client = TestClient(main_module.app)
-
-    def tearDown(self) -> None:
-        try:
-            self.temp_dir.cleanup()
-        except PermissionError:
-            pass
 
     def test_health_endpoint(self) -> None:
         response = self.client.get("/api/health")

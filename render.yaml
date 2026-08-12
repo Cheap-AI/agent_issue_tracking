@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: agent-issue-tracking-backend
+    env: python
+    buildCommand: pip install -r backend/requirements.txt && alembic upgrade head
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: PYTHON_VERSION
+        value: 3.14.0
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: PERPLEXITY_API_KEY
+        sync: false

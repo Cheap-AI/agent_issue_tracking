@@ -1,3 +1,17 @@
+# Next.js build output
+.next/
+out/
+
+# Database files
+*.db
+*.db-journal
+
+# npm lock file (optional - some teams commit this, some don't)
+package-lock.json
+
+# Python egg info
+*.egg-info/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

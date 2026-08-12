@@ -2,7 +2,9 @@
 
 - This is a Next.js frontend + FastAPI backend project.
 - Keep frontend code in app/ and backend code in backend/ (agents/, core/, models/, services/, workflows/), with the FastAPI app in backend/main.py.
-- Issue knowledge is stored as files under storage/ (storage/global/ for shared rubric/ranking/taxonomy docs, storage/issues/<id>/ for per-issue components), not in a database. Each knowledge component is versioned as immutable sequential files (v001.md, v002.md, ...).
+- Utility scripts are located in scripts/.
+- Experimental or practice code should be kept in archives/.
+- Issue knowledge is stored in a Supabase Postgres database (not files): the `issues` table holds metadata, the `components` table holds versioned knowledge (research/summary/timeline/sources/questions - each new version is an immutable row), and `global_docs` holds shared rubric/ranking/taxonomy docs. Access via SQLAlchemy in backend/core/ (db.py, issue.py, versioning.py, knowledge.py, global_docs.py). Schema changes go through Alembic migrations in backend/migrations/.
 - Prefer small, tested changes over large rewrites.
 - Keep the UI simple, clean, and consistent: clear spacing, readable typography, accessible contrast, and minimal clutter.
 - Keep backend endpoints focused, predictable, and easy to test.

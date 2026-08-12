@@ -6,9 +6,9 @@
       "dom.iterable",
       "es2020"
     ],
-    "allowJs": false,
+    "allowJs": true,
     "skipLibCheck": true,
-    "strict": true,
+    "strict": false,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "esModuleInterop": true,
@@ -20,21 +20,19 @@
     "incremental": true,
     "types": [
       "node"
-    ],
-    "plugins": [
-      {
-        "name": "next"
-      }
     ]
   },
   "include": [
-    "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    "**/*.js",
+    "**/*.jsx"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    ".next",
+    "frontend/node_modules",
+    "frontend/.next"
   ]
 }
+

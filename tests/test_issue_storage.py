@@ -1,34 +1,19 @@
-import os
-import tempfile
 import unittest
-from pathlib import Path
 
 from backend.core import knowledge
 from backend.core.issue import create_issue, get_issue, list_issues
 
 
 class IssueStorageTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.temp_dir = tempfile.TemporaryDirectory()
-        os.environ["STORAGE_ROOT"] = str(Path(self.temp_dir.name) / "storage")
-
-    def tearDown(self) -> None:
-        try:
-            self.temp_dir.cleanup()
-        except PermissionError:
-            pass
-
-    def test_create_issue_creates_folders_and_meta(self) -> None:
+    def test_create_issue_returns_expected_shape(self) -> None:
         issue = create_issue("Test issue", "A test summary.")
         self.assertTrue(issue["id"].startswith("iss-"))
         self.assertEqual(issue["title"], "Test issue")
+        self.assertEqual(issue["summary"], "A test summary.")
+        self.assertTrue(issue["is_active"])
 
-        storage_root = Path(os.environ["STORAGE_ROOT"])
-        issue_dir = storage_root / "issues" / issue["id"]
-        self.assertTrue(issue_dir.is_dir())
         for component in ("research", "summary", "timeline", "sources", "questions"):
-            self.assertTrue((issue_dir / component).is_dir())
-        self.assertTrue((issue_dir / "meta.json").is_file())
+            self.assertEqual(knowledge.read_history(issue["id"], component), [])
 
     def test_list_and_get_issue(self) -> None:
         created = create_issue("Another issue", "Another summary.")
@@ -71,3 +56,4 @@ class IssueStorageTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

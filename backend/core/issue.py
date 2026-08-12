@@ -1,84 +1,102 @@
-import json
-import os
+"""Issue CRUD backed by Postgres (Supabase).
+
+Replaces the previous file-based storage (meta.json per issue folder).
+"""
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from backend.core.db import get_session
+from backend.models.db_models import Issue, issue_id_seq
+
 COMPONENTS = ("research", "summary", "timeline", "sources", "questions")
-
-
-def _storage_root() -> Path:
-    return Path(os.environ.get("STORAGE_ROOT", "storage"))
-
-
-def _issues_root() -> Path:
-    return _storage_root() / "issues"
 
 
 def _utcnow_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def issue_dir(issue_id: str) -> Path:
-    return _issues_root() / issue_id
-
-
-def _meta_path(issue_id: str) -> Path:
-    return issue_dir(issue_id) / "meta.json"
-
-
-def _next_issue_id() -> str:
-    issues_root = _issues_root()
-    issues_root.mkdir(parents=True, exist_ok=True)
-    numbers = []
-    for path in issues_root.iterdir():
-        if path.is_dir() and path.name.startswith("iss-"):
-            try:
-                numbers.append(int(path.name.split("-", 1)[1]))
-            except ValueError:
-                continue
-    next_number = max(numbers, default=0) + 1
-    return f"iss-{next_number:04d}"
-
-
-def create_issue(title: str, summary: str) -> dict[str, Any]:
-    """Create a new issue folder with meta.json and the 5 knowledge component subfolders."""
-    new_id = _next_issue_id()
-    new_dir = issue_dir(new_id)
-    new_dir.mkdir(parents=True, exist_ok=True)
-    for component in COMPONENTS:
-        (new_dir / component).mkdir(exist_ok=True)
-
-    meta = {
-        "id": new_id,
-        "title": title.strip(),
-        "summary": summary.strip(),
-        "is_active": True,
-        "created_at": _utcnow_iso(),
+def _issue_to_dict(issue: Issue) -> dict[str, Any]:
+    return {
+        "id": issue.id,
+        "title": issue.title,
+        "summary": issue.summary,
+        "why": issue.why,
+        "tags": issue.tags or [],
+        "is_active": issue.is_active,
+        "created_at": issue.created_at.isoformat() if issue.created_at else _utcnow_iso(),
     }
-    _meta_path(new_id).write_text(json.dumps(meta, indent=2), encoding="utf-8")
-    return meta
 
 
-def list_issues() -> list[dict[str, Any]]:
-    """List all issues (reads meta.json from every issue folder), ordered by id."""
-    issues_root = _issues_root()
-    if not issues_root.exists():
-        return []
-
-    issues = []
-    for path in sorted(issues_root.iterdir()):
-        if not path.is_dir():
-            continue
-        meta_path = path / "meta.json"
-        if meta_path.exists():
-            issues.append(json.loads(meta_path.read_text(encoding="utf-8")))
-    return issues
+def _run_with_session(
+    provided_session: Session | None,
+    operation,
+):
+    if provided_session is not None:
+        return operation(provided_session)
+    with get_session() as managed_session:
+        return operation(managed_session)
 
 
-def get_issue(issue_id: str) -> dict[str, Any] | None:
-    """Return an issue's meta.json contents, or None if it doesn't exist."""
-    meta_path = _meta_path(issue_id)
-    if not meta_path.exists():
-        return None
-    return json.loads(meta_path.read_text(encoding="utf-8"))
+def create_issue(
+    title: str,
+    summary: str,
+    why: str = "",
+    tags: list[str] | None = None,
+    session: Session | None = None,
+) -> dict[str, Any]:
+    """Create a new issue row. Returns the issue as a dict."""
+    def _create(db: Session) -> dict[str, Any]:
+        next_number = db.execute(select(issue_id_seq.next_value())).scalar_one()
+        new_id = f"iss-{next_number:04d}"
+
+        issue = Issue(
+            id=new_id,
+            title=title.strip(),
+            summary=summary.strip(),
+            why=why.strip(),
+            tags=tags or [],
+            is_active=True,
+        )
+        db.add(issue)
+        db.flush()
+        db.refresh(issue)
+        return _issue_to_dict(issue)
+
+    return _run_with_session(session, _create)
+
+
+def list_issues(session: Session | None = None) -> list[dict[str, Any]]:
+    """List all issues, ordered by id."""
+    def _list(db: Session) -> list[dict[str, Any]]:
+        issues = db.execute(select(Issue).order_by(Issue.id)).scalars().all()
+        return [_issue_to_dict(issue) for issue in issues]
+
+    return _run_with_session(session, _list)
+
+
+def get_issue(issue_id: str, session: Session | None = None) -> dict[str, Any] | None:
+    """Return a single issue as a dict, or None if it doesn't exist."""
+    def _get(db: Session) -> dict[str, Any] | None:
+        issue = db.get(Issue, issue_id)
+        if issue is None:
+            return None
+        return _issue_to_dict(issue)
+
+    return _run_with_session(session, _get)
+
+
+def delete_issue(issue_id: str, session: Session | None = None) -> bool:
+    """Delete an issue by id. Returns True if deleted, False if not found."""
+    def _delete(db: Session) -> bool:
+        issue = db.get(Issue, issue_id)
+        if issue is None:
+            return False
+        db.delete(issue)
+        db.commit()
+        return True
+
+    return _run_with_session(session, _delete)
+
