@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.core.db import get_session
-from backend.models.db_models import Issue, issue_id_seq
+from backend.models.db_models import Event, Issue, issue_id_seq
 
 COMPONENTS = ("research", "summary", "timeline", "sources", "questions")
 
@@ -99,4 +99,32 @@ def delete_issue(issue_id: str, session: Session | None = None) -> bool:
         return True
 
     return _run_with_session(session, _delete)
+
+
+def _event_to_dict(event: Event) -> dict[str, Any]:
+    return {
+        "id": event.id,
+        "event_date": event.event_date.isoformat() if event.event_date else None,
+        "discovered_at": event.discovered_at.isoformat() if event.discovered_at else _utcnow_iso(),
+        "title": event.title,
+        "description": event.description,
+        "source_urls": event.source_urls or [],
+    }
+
+
+def list_events_for_issue(issue_id: str, session: Session | None = None) -> list[dict[str, Any]]:
+    """List events for an issue in chronological order.
+
+    Ordered by event_date ascending (nulls last), then discovered_at ascending
+    as a tiebreaker/fallback for events without a known date.
+    """
+    def _list(db: Session) -> list[dict[str, Any]]:
+        events = db.execute(
+            select(Event)
+            .where(Event.issue_id == issue_id)
+            .order_by(Event.event_date.is_(None), Event.event_date.asc(), Event.discovered_at.asc())
+        ).scalars().all()
+        return [_event_to_dict(event) for event in events]
+
+    return _run_with_session(session, _list)
 
