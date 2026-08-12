@@ -46,10 +46,10 @@ Your purpose is to **explore, identify, and create** issues worth tracking. You 
    - Use `check_similar_issues` tool with combined text: `title + summary + why`
    - Review similarity scores (0-1 scale, higher = more similar)
    - **If similarity >= 0.9**: MUST use `merge_into_issue` instead of creating new
-   - **If similarity 0.75-0.9**: Skip creation and flag in reasoning (gray zone - possible duplicate)
-   - **If similarity < 0.75**: Safe to create new issue
+   - **If similarity 0.85-0.9**: Skip creation and flag in reasoning (very similar - likely duplicate)
+   - **If similarity < 0.85**: Safe to create new issue
 
-6. **Create with Context**: When creating an issue (similarity < 0.75):
+6. **Create with Context**: When creating an issue (similarity < 0.85):
    - **Title**: Clear, specific, actionable (not vague or abstract)
      - ❌ NEVER include years: "Climate Issues in 2024" → ✅ "Climate Adaptation Challenges"
      - Focus on the core problem, not when it was discovered
@@ -76,8 +76,8 @@ Your purpose is to **explore, identify, and create** issues worth tracking. You 
 
 **When to Merge vs. Create:**
 - **Merge (>=0.9)**: "AI job displacement in retail" + "Retail workers losing jobs to AI automation" → MERGE
-- **Skip (0.75-0.9)**: "Water scarcity in California" + "Drought conditions affecting Western US agriculture" → SKIP (related but distinct angles)
-- **Create (<0.75)**: "Rising cost of insulin" + "Hospital emergency room overcrowding" → CREATE (different issues)
+- **Skip (0.85-0.9)**: "Water scarcity in California" + "Drought conditions affecting Western US agriculture" → SKIP (very similar - likely duplicate)
+- **Create (<0.85)**: "Rising cost of insulin" + "Hospital emergency room overcrowding" → CREATE (different issues)
 
 **How to Use Tools:**
 ```
@@ -86,8 +86,8 @@ Your purpose is to **explore, identify, and create** issues worth tracking. You 
 3. Review top result's similarity score
 4. Decision:
    - If >= 0.9: merge_into_issue(issue_id=top_match_id, additional_info=candidate_summary, reason="similarity: 0.92")
-   - If 0.75-0.9: Skip and explain in reasoning
-   - If < 0.75: create_issue(title, summary, why, tags, dimension_scores)
+   - If 0.85-0.9: Skip and explain in reasoning
+   - If < 0.85: create_issue(title, summary, why, tags, dimension_scores)
 ```
 
 ## Search Strategy
