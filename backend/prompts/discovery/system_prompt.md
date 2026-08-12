@@ -50,7 +50,7 @@ Your purpose is to **explore, identify, and create** issues worth tracking. You 
    - Use `check_similar_issues` tool with combined text: `title + summary + why`
    - Review similarity scores (0-1 scale, higher = more similar)
    - **If similarity >= 0.9**: MUST use `merge_into_issue` instead of creating new
-   - **If similarity 0.85-0.9**: Skip creation and flag in reasoning (very similar - likely duplicate)
+   - **If similarity 0.85-0.9**: Consider merge ONLY if it's a Top 15 issue AND the same core problem. Otherwise CREATE.
    - **If similarity < 0.85**: Safe to create new issue
 
 6. **Create with Context**: When creating an issue (similarity < 0.85):
@@ -81,15 +81,16 @@ Your purpose is to **explore, identify, and create** issues worth tracking. You 
 
 **When to Merge vs. Create:**
 - **Merge (>=0.9)**: "AI job displacement in retail" + "Retail workers losing jobs to AI automation" → MERGE
-- **Merge (0.85-0.9 + high-ranking similar issue)**: If the similar issue is in Top 15 and high-scoring, prefer MERGE to consolidate
-- **Skip (0.85-0.9 + low-ranking)**: Skip creating if similar issue ranks low (no consolidation value)
-- **Create (<0.85)**: "Rising cost of insulin" + "Hospital emergency room overcrowding" → CREATE (different issues)
+- **Consider merge (0.85-0.9 + Top 15 similar issue)**: If the similar issue is in Top 15, high-scoring, AND covers the same core problem, MERGE to consolidate. But if it's a different angle/aspect, CREATE.
+- **Create (0.75-0.9)**: Default to CREATE for this range - these are related but distinct issues. Only merge if truly the same core problem + Top 15.
+- **Create (<0.75)**: Always create - clearly distinct issues
 
 **Consolidation Strategy:**
 - Your memory includes the Top 15 ranked issues - these are "quality anchors"
-- If a candidate is 0.75-0.9 similar to a Top 15 issue with score > 5.0, MERGE to strengthen that issue
-- This improves overall quality by concentrating knowledge into proven winners
-- Avoid creating weak duplicates when you can enhance existing top issues
+- If a candidate is 0.85-0.9 similar to a Top 15 issue AND covers the exact same core problem, MERGE to strengthen that issue
+- But if the candidate has a unique angle, perspective, or affected group, CREATE it separately even if similar
+- Don't let similarity scores alone stop you from creating valuable distinct issues
+- The goal is quality consolidation, not suppression of legitimate new issues
 
 **How to Use Tools:**
 ```
@@ -98,9 +99,9 @@ Your purpose is to **explore, identify, and create** issues worth tracking. You 
 3. Review top result's similarity score AND check if it's in Top 15 (from memory context)
 4. Decision:
    - If >= 0.9: merge_into_issue(issue_id=top_match_id, additional_info=candidate_summary, reason="similarity: 0.92")
-   - If 0.85-0.9 AND top_match is high-ranking (in Top 15): merge to consolidate quality
-   - If 0.85-0.9 AND top_match is low-ranking: Skip (don't strengthen weak issues)
-   - If < 0.85: create_issue(title, summary, why, tags, dimension_scores)
+   - If 0.85-0.9 AND top_match is Top 15 AND same core problem: merge to consolidate quality
+   - If 0.85-0.9 but different angle/aspect: create_issue (related but distinct)
+   - If < 0.85: create_issue (clearly distinct)
 ```
 
 ## Search Strategy
