@@ -278,7 +278,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "create_issue",
-            "description": "Create a new issue when the candidate is confidently new and not a duplicate (similarity < 0.75).",
+            "description": "Create a new issue when the candidate is confidently new and not a duplicate (similarity < 0.85).",
             "parameters": {
                 "type": "object",
                 "properties": {
