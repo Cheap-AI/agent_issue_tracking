@@ -28,6 +28,19 @@ engine = create_engine(_database_url(), pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 
+def get_db() -> Iterator[Session]:
+    """FastAPI dependency that provides one managed DB session per request."""
+    session = SessionLocal()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
 @contextmanager
 def get_session() -> Iterator[Session]:
     """Context manager yielding a SQLAlchemy session, committing on success."""

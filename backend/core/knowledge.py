@@ -1,3 +1,5 @@
+from fastapi import BackgroundTasks
+
 from backend.core import versioning
 from backend.core.db import get_session
 from backend.core.issue import COMPONENTS
@@ -6,19 +8,47 @@ from backend.services.chunking import chunk_text
 from backend.services.embedding import generate_embeddings_batch
 
 
-def update_component(issue_id: str, component: str, new_content: str) -> int:
+def update_component(
+    issue_id: str,
+    component: str,
+    new_content: str,
+    background_tasks: BackgroundTasks | None = None,
+) -> int:
     """Save new_content as the next immutable version of a knowledge component
     (research/summary/timeline/sources/questions). Returns the new version number.
     
-    Also generates and stores embeddings for the new content.
+    Args:
+        issue_id: Issue identifier
+        component: Component type (research/summary/timeline/sources/questions)
+        new_content: Content to save
+        background_tasks: FastAPI BackgroundTasks for async embedding generation.
+                         If None, embeddings are generated synchronously (useful for testing).
+    
+    Returns:
+        Version number of the saved component
+        
+    Note:
+        When background_tasks is provided, the function returns immediately and embeddings
+        are generated in background using FastAPI's thread pool. When None, it blocks until
+        embeddings are done (useful for scripts and testing).
     """
     if component not in COMPONENTS:
         raise ValueError(f"Unknown component '{component}', expected one of {COMPONENTS}")
     
     version = versioning.save_version(issue_id, component, new_content)
     
-    # Generate embeddings asynchronously after save
-    _generate_embeddings_for_component(issue_id, component, version, new_content)
+    if background_tasks:
+        # Queue background task - FastAPI manages the thread pool
+        background_tasks.add_task(
+            _generate_embeddings_for_component,
+            issue_id,
+            component,
+            version,
+            new_content
+        )
+    else:
+        # Synchronous mode for testing/scripts
+        _generate_embeddings_for_component(issue_id, component, version, new_content)
     
     return version
 

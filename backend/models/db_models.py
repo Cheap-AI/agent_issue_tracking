@@ -41,6 +41,8 @@ class Issue(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    why: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
@@ -174,3 +176,71 @@ class TrackedIssue(Base):
     )
 
     issue: Mapped["Issue"] = relationship(back_populates="tracked_issue")
+
+
+class IssueEmbedding(Base):
+    """Vector embeddings of issues for fast duplicate detection.
+    
+    One row per issue, embedding built from title + summary + why.
+    Used by discovery agent for semantic deduplication before creating new issues.
+    """
+    __tablename__ = "issue_embeddings"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    issue_id: Mapped[str] = mapped_column(
+        ForeignKey("issues.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    embedding: Mapped[str] = mapped_column(Text, nullable=False)  # Stored as text, cast to vector(1536) in queries
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class DiscoveryReport(Base):
+    """Discovery agent run reports stored in Postgres.
+    
+    Replaces JSON file storage (storage/discovery_reports/*.json).
+    Each report captures metadata, API usage, findings, and proposed duplicates.
+    """
+    __tablename__ = "discovery_reports"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    topic: Mapped[str] = mapped_column(Text, nullable=False)
+    instruction: Mapped[str] = mapped_column(Text, nullable=False)
+    target_count: Mapped[int] = mapped_column(nullable=False)
+    actual_created: Mapped[int] = mapped_column(nullable=False)
+    iterations: Mapped[int] = mapped_column(nullable=False)
+    review_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    api_usage: Mapped[dict] = mapped_column(JSON, nullable=False, server_default="{}")
+    findings: Mapped[list] = mapped_column(JSON, nullable=False, server_default="[]")
+    proposed_duplicates: Mapped[list] = mapped_column(JSON, nullable=False, server_default="[]")
+    summary: Mapped[str] = mapped_column(Text, nullable=False, server_default="")  # Changed to Text for narrative summaries
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    chunks: Mapped[list["DiscoveryReportChunk"]] = relationship(
+        back_populates="report", cascade="all, delete-orphan"
+    )
+
+
+class DiscoveryReportChunk(Base):
+    """Chunked and embedded discovery reports for semantic memory recall.
+    
+    Discovery agent can query past reports to recall effective strategies,
+    avoid repeating failed approaches, and learn from past runs.
+    """
+    __tablename__ = "discovery_report_chunks"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    report_id: Mapped[int] = mapped_column(
+        ForeignKey("discovery_reports.id", ondelete="CASCADE"), nullable=False
+    )
+    chunk_index: Mapped[int] = mapped_column(nullable=False)
+    chunk_text: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[str] = mapped_column(Text, nullable=False)  # Stored as text, cast to vector(1536) in queries
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    report: Mapped["DiscoveryReport"] = relationship(back_populates="chunks")
