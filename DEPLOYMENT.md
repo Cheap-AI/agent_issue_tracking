@@ -29,7 +29,8 @@
 
 2. **Set environment variables in Vercel:**
    - Go to Project Settings → Environment Variables
-   - Add: `NEXT_PUBLIC_API_BASE_URL` = `https://your-backend-url.onrender.com`
+   - Add: `NEXT_PUBLIC_API_BASE_URL` = `https://your-backend-url.onrender.com/api`
+   - **Important:** Include `/api` at the end since all backend routes use this prefix
    - Select: Production, Preview, Development (all environments)
    - Click Save
 
