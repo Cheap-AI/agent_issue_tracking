@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import text
 
 from backend.agents.discovery.agent import discover_issues
+from backend.agents.ranking.agent import get_leaderboard
 from backend.workflows.discovery_reports import generate_report, save_report, get_discovery_insights, load_recent_reports
 from backend.services.vector_search import search_similar_reports
 from backend.core.db import get_session
@@ -34,14 +35,16 @@ def _runs_today() -> int:
         return count or 0
 
 
-# Builds compact memory context from semantic search over past reports.
+# Builds compact memory context from semantic search over past reports and current leaderboard.
 def _build_memory_context(topic: str, instruction: str) -> str:
-    """Build memory context using RAG retrieval from past discovery runs.
+    """Build memory context using RAG retrieval from past discovery runs and top-ranked issues.
     
     Searches past reports semantically to recall:
     - Effective search queries for similar topics
     - Issues created in similar domains
     - Strategies that worked or failed
+    
+    Also includes current top-ranked issues to guide consolidation preferences.
     
     Args:
         topic: Current discovery topic
@@ -50,21 +53,39 @@ def _build_memory_context(topic: str, instruction: str) -> str:
     Returns:
         Formatted memory context string for agent
     """
+    context_lines = []
+    
+    # Include top-ranked issues as reference (consolidate into winners)
+    try:
+        leaderboard = get_leaderboard(limit=15)
+        if leaderboard:
+            context_lines.append("Top-Ranked Issues (Consolidation Priorities):")
+            context_lines.append("Prefer merging into these high-scoring issues:")
+            context_lines.append("")
+            for issue in leaderboard[:10]:
+                overall_score = issue.get('overall_score', 0)
+                title = issue.get('title', 'Unknown')
+                context_lines.append(f"- {title} (score: {overall_score:.1f})")
+            context_lines.append("")
+            context_lines.append("Strategy: When a new candidate is similar (0.75-0.9) to one of these top issues,")
+            context_lines.append("prefer MERGING into the top-ranked version rather than creating a duplicate.")
+            context_lines.append("")
+    except Exception:
+        pass  # Silently skip if ranking not available
+    
     # Search for similar past runs
     query = f"{topic} {instruction}".strip() or "discovery runs"
     similar_reports = search_similar_reports(query, top_k=3)
     
-    if not similar_reports:
-        return "No prior discovery runs found in similar domains."
-    
-    context_lines = ["Past Discovery Runs (similar to current focus):", ""]
-    
-    for report in similar_reports:
-        context_lines.append(f"- Topic: {report['topic']}")
-        context_lines.append(f"  Instruction: {report['instruction']}")
-        context_lines.append(f"  Findings: {len(report['findings'])} issues created")
-        context_lines.append(f"  Relevant context: {report['chunk_text'][:200]}...")
+    if similar_reports:
+        context_lines.append("Past Discovery Runs (similar to current focus):")
         context_lines.append("")
+        for report in similar_reports:
+            context_lines.append(f"- Topic: {report['topic']}")
+            context_lines.append(f"  Instruction: {report['instruction']}")
+            context_lines.append(f"  Findings: {len(report['findings'])} issues created")
+            context_lines.append(f"  Relevant context: {report['chunk_text'][:200]}...")
+            context_lines.append("")
     
     # Also load recent runs for broader context (last 5 runs)
     recent_reports = load_recent_reports(limit=5)
@@ -74,7 +95,7 @@ def _build_memory_context(topic: str, instruction: str) -> str:
         for report in recent_reports[:3]:
             context_lines.append(f"- {report['metadata']['topic']}: {report['metadata']['actual_created']} issues created")
     
-    return "\n".join(context_lines)
+    return "\n".join(context_lines) or "Memory context: No prior discovery or ranking data available."
 
 
 # Runs one bounded discovery execution with daily caps and RAG-based memory.
