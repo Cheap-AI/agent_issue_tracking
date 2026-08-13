@@ -25,10 +25,8 @@ type EventItem = {
 };
 
 const getApiBaseUrl = () => {
-  if (typeof window === "undefined") {
-    return "/api";
-  }
-
+  // In production, use the full backend URL (e.g., https://backend.com/api)
+  // In development, use /api which is proxied to localhost:8000
   return process.env.NEXT_PUBLIC_API_BASE_URL || "/api";
 };
 
