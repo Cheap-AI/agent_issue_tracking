@@ -171,7 +171,7 @@ function LeaderboardPanel({ entries }: { entries: LeaderboardEntry[] }) {
         <div style={{ color: "#6b7280", fontSize: "0.9rem" }}>No ranked issues yet.</div>
       ) : (
         <div style={{ display: "grid", gap: "0.6rem" }}>
-          {entries.map((entry) => (
+          {entries.slice(0, 20).map((entry) => (
             <button
               key={entry.issue_id}
               onClick={() => router.push(`/issues/${entry.issue_id}`)}
