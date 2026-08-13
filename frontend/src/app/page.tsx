@@ -192,9 +192,9 @@ function LeaderboardPanel({ entries }: { entries: LeaderboardEntry[] }) {
                 textAlign: "left",
               }}
             >
-              <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", minWidth: 0 }}>
+              <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", minWidth: 0, flex: 1, overflow: "hidden" }}>
                 <span style={{ fontWeight: 700, color: "#6b7280", fontSize: "0.85rem", flexShrink: 0 }}>#{entry.rank}</span>
-                <span style={{ fontSize: "0.85rem", color: "#14213d", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.title}</span>
+                <span style={{ fontSize: "0.85rem", color: "#14213d", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{entry.title}</span>
               </div>
               <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "#3b82f6", flexShrink: 0 }}>{entry.overall_score}</span>
             </button>
@@ -284,7 +284,6 @@ export default function Home() {
         >
           <div style={{ fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 700, color: "#6b7280" }}>Issue Tracker</div>
           <h1 style={{ margin: "0.25rem 0", fontSize: "1.7rem" }}>Discovered issues, ranked and tracked over time.</h1>
-          <p style={{ margin: 0, color: "#5b6473", maxWidth: "720px" }}>Hover a card for a quick preview, or click through for the full timeline of events.</p>
         </motion.header>
 
         {error ? <div style={{ color: "crimson" }}>{error}</div> : null}
@@ -357,7 +356,7 @@ export default function Home() {
               </div>
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem" }}>
-                {filteredIssues.map((issue, index) => (
+                {filteredIssues.slice(0, 20).map((issue, index) => (
                   <IssueCard key={issue.id} issue={issue} tone={cardTones[index % cardTones.length]} apiBaseUrl={apiBaseUrl} />
                 ))}
               </div>
