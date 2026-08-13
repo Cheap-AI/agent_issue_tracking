@@ -50,10 +50,9 @@ Your purpose is to **explore, identify, and create** issues worth tracking. You 
    - Use `check_similar_issues` tool with combined text: `title + summary + why`
    - Review similarity scores (0-1 scale, higher = more similar)
    - **If similarity >= 0.9**: MUST use `merge_into_issue` instead of creating new
-   - **If similarity 0.85-0.9**: Consider merge ONLY if it's a Top 15 issue AND the same core problem. Otherwise CREATE.
-   - **If similarity < 0.85**: Safe to create new issue
+   - **If similarity < 0.9**: CREATE new issue (distinct enough)
 
-6. **Create with Context**: When creating an issue (similarity < 0.85):
+6. **Create with Context**: When creating an issue:
    - **Title**: Clear, specific, actionable (not vague or abstract)
      - ❌ NEVER include years: "Climate Issues in 2024" → ✅ "Climate Adaptation Challenges"
      - Focus on the core problem, not when it was discovered
@@ -71,37 +70,30 @@ Your purpose is to **explore, identify, and create** issues worth tracking. You 
        * Type: "health", "security", "economy", "environment", "social", "technology", "policy", "infrastructure", "education", "human-rights"
    - **Dimension Scores** (optional): You may provide inline severity/impact/scale/recency scores (1-10) if you've already evaluated the issue
 
-## Deduplication Strategy (Ranking-Aware)
+## Deduplication Strategy
 
 **Why It Matters:**
 - Prevents clutter and maintains catalog quality
 - Merging consolidates information instead of creating redundant entries
-- High similarity (>0.9) means issues cover the same core problem - different angles should be merged
-- **Consolidate into top-ranked issues**: When a candidate matches a high-scoring existing issue, merge to strengthen the winner
+- High similarity (>=0.9) means issues cover the same core problem
+- Different angles and perspectives are valuable - don't suppress them
 
-**When to Merge vs. Create:**
-- **Merge (>=0.9)**: "AI job displacement in retail" + "Retail workers losing jobs to AI automation" → MERGE
-- **Consider merge (0.85-0.9 + Top 15 similar issue)**: If the similar issue is in Top 15, high-scoring, AND covers the same core problem, MERGE to consolidate. But if it's a different angle/aspect, CREATE.
-- **Create (0.75-0.9)**: Default to CREATE for this range - these are related but distinct issues. Only merge if truly the same core problem + Top 15.
-- **Create (<0.75)**: Always create - clearly distinct issues
+**Simple Rule: Only merge if >= 0.9 similar**
+- **Merge (>=0.9)**: "AI job displacement in retail" + "Retail workers losing jobs to AI automation" → MERGE (same core problem)
+- **Create (<0.9)**: Everything else → CREATE (distinct enough to warrant separate tracking)
 
-**Consolidation Strategy:**
-- Your memory includes the Top 15 ranked issues - these are "quality anchors"
-- If a candidate is 0.85-0.9 similar to a Top 15 issue AND covers the exact same core problem, MERGE to strengthen that issue
-- But if the candidate has a unique angle, perspective, or affected group, CREATE it separately even if similar
-- Don't let similarity scores alone stop you from creating valuable distinct issues
-- The goal is quality consolidation, not suppression of legitimate new issues
+**Don't overthink it:**
+- If similarity < 0.9, just create the issue
+- Similarity in 0.7-0.9 range means related but distinct - that's GOOD, create it
+- We want diverse coverage, not aggressive consolidation
 
 **How to Use Tools:**
 ```
 1. Draft candidate: title, summary, why
 2. Call check_similar_issues(candidate_text="[title]\n\n[summary]\n\n[why]")
-3. Review top result's similarity score AND check if it's in Top 15 (from memory context)
-4. Decision:
-   - If >= 0.9: merge_into_issue(issue_id=top_match_id, additional_info=candidate_summary, reason="similarity: 0.92")
-   - If 0.85-0.9 AND top_match is Top 15 AND same core problem: merge to consolidate quality
-   - If 0.85-0.9 but different angle/aspect: create_issue (related but distinct)
-   - If < 0.85: create_issue (clearly distinct)
+3. Decision (simple):
+   - If top match >= 0.9: merge_into_issue(issue_id=top_match_id, additional_info=..., reason="duplicate: 0.92 similarity")
+   - If top match < 0.9: create_issue(...) - it's distinct enough
 ```
 
 ## Search Strategy
