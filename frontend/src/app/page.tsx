@@ -275,6 +275,20 @@ export default function Home() {
 
   return (
     <main style={{ minHeight: "100vh", padding: "1.25rem", paddingTop: "5rem", fontFamily: "Inter, sans-serif", background: "linear-gradient(135deg, #f7f8ff 0%, #fdfcf8 100%)", color: "#14213d" }}>
+      <style>{`
+        @media (max-width: 768px) {
+          .responsive-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .responsive-grid > div:last-child {
+            order: -1;
+          }
+          main {
+            padding: 1rem !important;
+            padding-top: 4rem !important;
+          }
+        }
+      `}</style>
       <div style={{ maxWidth: "1200px", margin: "0 auto", display: "grid", gap: "1.25rem" }}>
         <motion.header
           initial={{ opacity: 0, y: 12 }}
@@ -288,7 +302,7 @@ export default function Home() {
 
         {error ? <div style={{ color: "crimson" }}>{error}</div> : null}
 
-        <section style={{ display: "grid", gridTemplateColumns: "minmax(0, 2.2fr) minmax(260px, 1fr)", gap: "1.25rem", alignItems: "start" }}>
+        <section className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 2.2fr) minmax(260px, 1fr)", gap: "1.25rem", alignItems: "start" }}>
           <div style={{ borderRadius: 28, padding: "1.2rem", background: "rgba(255,255,255,0.82)", border: "1px solid rgba(20,33,61,0.08)", boxShadow: "0 18px 45px rgba(20,33,61,0.08)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.95rem" }}>
               <div style={{ fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 700, color: "#6b7280" }}>Issues</div>
