@@ -222,46 +222,6 @@ def trigger_events_collection(
     }
 
 
-@app.post("/api/issues/{issue_id}/research")
-def trigger_research_workflow(
-    issue_id: str,
-    background_tasks: BackgroundTasks,
-    search_query: str | None = None,
-    session: Session = Depends(get_db),
-) -> dict[str, object]:
-    """Trigger the complete research → summary → ranking workflow.
-    
-    This endpoint runs all three agents in sequence:
-    1. Research Agent: Conducts research using RAG + Tavily
-    2. Summary Agent: Generates executive summary
-    3. Ranking Agent: Scores issue and updates leaderboard
-    
-    The workflow runs in the background.
-    """
-    # Verify issue exists
-    issue = get_issue(issue_id, session=session)
-    if issue is None:
-        raise HTTPException(status_code=404, detail="Issue not found")
-    
-    # Use issue title as search query if not provided
-    if not search_query:
-        search_query = issue["title"]
-    
-    # Queue the complete workflow in background
-    background_tasks.add_task(
-        quick_update,
-        issue_id=issue_id,
-        search_query=search_query
-    )
-    
-    return {
-        "issue_id": issue_id,
-        "search_query": search_query,
-        "status": "workflow started",
-        "message": "Research → Summary → Ranking agents running in background"
-    }
-
-
 def _run_discovery_with_logging(
     topic: str,
     instruction: str,

@@ -1,8 +1,12 @@
 """Vector similarity search using pgvector."""
 from sqlalchemy import text
 
+from langfuse import get_client
+
 from backend.core.db import get_session
 from backend.services.embedding import generate_embedding
+
+langfuse = get_client()
 
 
 def search_similar_issues_by_text(
@@ -47,18 +51,23 @@ def search_similar_issues_by_text(
         LIMIT :top_k
     """
     
-    with get_session() as session:
-        result = session.execute(text(sql), params)
-        rows = result.fetchall()
-        
-        return [
-            {
-                "issue_id": row[0],
-                "title": row[1],
-                "similarity": float(row[2]),
-            }
-            for row in rows
-        ]
+    with langfuse.start_as_current_observation(
+        as_type="retriever", name="search_similar_issues_by_text", input={"query": candidate_text, "top_k": top_k}
+    ) as retriever_span:
+        with get_session() as session:
+            result = session.execute(text(sql), params)
+            rows = result.fetchall()
+
+            results = [
+                {
+                    "issue_id": row[0],
+                    "title": row[1],
+                    "similarity": float(row[2]),
+                }
+                for row in rows
+            ]
+        retriever_span.update(output=results)
+        return results
 
 
 def store_issue_embedding(
@@ -138,22 +147,27 @@ def search_similar_reports(
     """
     
     params = {"embedding": embedding_str, "top_k": top_k}
-    
-    with get_session() as session:
-        result = session.execute(text(sql), params)
-        rows = result.fetchall()
-        
-        return [
-            {
-                "report_id": int(row[0]),
-                "topic": row[1],
-                "instruction": row[2],
-                "findings": row[3],  # JSONB is returned as dict
-                "chunk_text": row[4],
-                "similarity": float(row[5]),
-            }
-            for row in rows
-        ]
+
+    with langfuse.start_as_current_observation(
+        as_type="retriever", name="search_similar_reports", input={"query": query, "top_k": top_k}
+    ) as retriever_span:
+        with get_session() as session:
+            result = session.execute(text(sql), params)
+            rows = result.fetchall()
+
+            results = [
+                {
+                    "report_id": int(row[0]),
+                    "topic": row[1],
+                    "instruction": row[2],
+                    "findings": row[3],  # JSONB is returned as dict
+                    "chunk_text": row[4],
+                    "similarity": float(row[5]),
+                }
+                for row in rows
+            ]
+        retriever_span.update(output=results)
+        return results
 
 
 def search_similar_content(

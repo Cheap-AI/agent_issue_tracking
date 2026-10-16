@@ -8,11 +8,15 @@ from typing import Any
 
 from sqlalchemy import text
 
+from langfuse import get_client, propagate_attributes
+
 from backend.agents.discovery.agent import discover_issues
 from backend.agents.ranking.agent import get_leaderboard
 from backend.workflows.discovery_reports import generate_report, save_report, get_discovery_insights, load_recent_reports
 from backend.services.vector_search import search_similar_reports
 from backend.core.db import get_session
+
+langfuse = get_client()
 
 
 # Counts discovery runs created in the current UTC day from Postgres.
@@ -138,18 +142,23 @@ def discover_issue(
     memory_context = _build_memory_context(topic, instruction)
     
     started_at = datetime.now(timezone.utc).isoformat()
-    result = discover_issues(
-        topic=topic,
-        instruction=instruction,
-        target_issue_count=target_issue_count,
-        require_evaluation=require_evaluation,
-        max_results=max_results,
-        max_iterations=max_iterations,
-        seed_created_issues=seed_created_issues,
-        require_human_review=require_human_review,
-        override_human_review=override_human_review,
-        memory_context=memory_context,
-    )
+    with propagate_attributes(
+        session_id=f"discovery-{started_at}",
+        tags=["discovery"],
+        metadata={"topic": topic or "autonomous"},
+    ):
+        result = discover_issues(
+            topic=topic,
+            instruction=instruction,
+            target_issue_count=target_issue_count,
+            require_evaluation=require_evaluation,
+            max_results=max_results,
+            max_iterations=max_iterations,
+            seed_created_issues=seed_created_issues,
+            require_human_review=require_human_review,
+            override_human_review=override_human_review,
+            memory_context=memory_context,
+        )
     
     # Generate and save report to Postgres (with embeddings for future RAG)
     report = generate_report(result, topic, instruction)
@@ -187,6 +196,9 @@ def discover_issue(
         "insights": insights
     }
     
+    # Ensure buffered traces are sent since this often runs as a FastAPI BackgroundTask.
+    langfuse.flush()
+
     return result
 
 

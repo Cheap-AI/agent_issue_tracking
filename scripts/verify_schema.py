@@ -1,4 +1,18 @@
-"""Quick script to verify Phase 2 schema changes."""
+"""
+✅ Verify Database Schema
+
+Validate that all database tables and indexes are correctly created.
+Checks: table existence, column definitions, indexes, constraints
+
+Usage:
+    python -m scripts.verify_schema
+
+Output:
+    - Schema validation results
+    - Table structure report
+    - Index verification
+    - Migration status
+"""
 from backend.core.db import get_session
 from sqlalchemy import text
 

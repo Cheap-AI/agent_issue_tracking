@@ -1,3 +1,21 @@
+"""
+📝 Monitor Issues
+
+Inspect detailed information about specific or all issues.
+Shows: title, summary, tags, why, created date
+
+Usage:
+    python -m scripts.inspect_issues
+
+    python -m scripts.inspect_issues --id iss-0001
+
+    python -m scripts.inspect_issues --tag technology
+
+Output:
+    - Issue metadata (title, summary, tags)
+    - Creation timestamps
+    - Issue relationships
+"""
 from backend.core.issue import list_issues
 
 
