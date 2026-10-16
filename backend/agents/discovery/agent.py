@@ -14,7 +14,8 @@ import os
 from pathlib import Path
 from typing import Any
 
-from openai import OpenAI
+from langfuse.openai import OpenAI
+from langfuse import get_client
 
 from backend.core.issue import create_issue, get_issue, list_issues
 from backend.services import search_service
@@ -28,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+langfuse = get_client()
 
 PROMPT_PATH = Path(__file__).resolve().parents[2] / "prompts" / "discovery" / "system_prompt.md"
 DEFAULT_MODEL = os.getenv("OPENAI_DISCOVERY_MODEL", "gpt-4o")  # Use gpt-4o for better reasoning (was gpt-4o-mini)
@@ -433,119 +435,169 @@ def discover_issues(
     proposed_issues: list[dict[str, Any]] = []
     proposed_duplicates: list[dict[str, Any]] = []  # Track candidates merged due to high similarity
     final_message = ""
+    tool_calls_total = 0
 
     logger.info(f"[DISCOVERY] Starting discovery loop: target={target_issue_count}, max_iterations={max_iterations}")
 
-    for iteration in range(max_iterations):
-        logger.info(f"\n{'='*50}")
-        logger.info(f"Iteration {iteration + 1}/{max_iterations}")
-        logger.info(f"{'='*50}")
-        
-        response = client.chat.completions.create(
-            model=DEFAULT_MODEL,
-            messages=messages,
-            tools=TOOLS,
-            tool_choice="auto",
-            temperature=0.2,
-            max_tokens=1200,
+    agent_span = langfuse.start_observation(
+        as_type="agent",
+        name="discover_issues",
+        input={
+            "topic": topic,
+            "instruction": instruction,
+            "target_issue_count": target_issue_count,
+            "max_iterations": max_iterations,
+            "review_mode": review_mode,
+        },
+    )
+
+    try:
+        for iteration in range(max_iterations):
+            logger.info(f"\n{'='*50}")
+            logger.info(f"Iteration {iteration + 1}/{max_iterations}")
+            logger.info(f"{'='*50}")
+
+            response = client.chat.completions.create(
+                model=DEFAULT_MODEL,
+                messages=messages,
+                tools=TOOLS,
+                tool_choice="auto",
+                temperature=0.2,
+                max_tokens=1200,
+            )
+
+            assistant_message = response.choices[0].message
+            logger.info(f"[RESPONSE] Agent response: {assistant_message.content[:200] if assistant_message.content else '(no content)'}")
+            logger.info(f"[TOOLS] Tool calls: {len(assistant_message.tool_calls) if assistant_message.tool_calls else 0}")
+            assistant_payload: dict[str, Any] = {"role": "assistant", "content": assistant_message.content or ""}
+            selected_tools = (
+                [tool_call.function.name for tool_call in assistant_message.tool_calls]
+                if assistant_message.tool_calls
+                else []
+            )
+            # Capture the routing/trajectory decision for this turn.
+            agent_span.update(
+                metadata={
+                    "last_iteration": iteration + 1,
+                    "last_selected_tools": selected_tools,
+                    "last_reasoning": (assistant_message.content or "")[:300],
+                }
+            )
+            if assistant_message.tool_calls:
+                assistant_payload["tool_calls"] = [
+                    tool_call.model_dump() if hasattr(tool_call, "model_dump") else tool_call
+                    for tool_call in assistant_message.tool_calls
+                ]
+            messages.append(assistant_payload)
+
+            if assistant_message.tool_calls:
+                for tool_call in assistant_message.tool_calls:
+                    tool_name = tool_call.function.name
+                    tool_arguments = json.loads(tool_call.function.arguments or "{}")
+                    
+                    logger.info(f"  [EXECUTE] Tool: {tool_name} | Args: {str(tool_arguments)[:150]}")
+
+                    if review_mode and tool_name == "create_issue":
+                        proposal = {
+                            "title": tool_arguments.get("title", ""),
+                            "summary": tool_arguments.get("summary", ""),
+                            "why": tool_arguments.get("why", ""),
+                            "search_query": topic,
+                            "reason": "Human review required before issue creation",
+                        }
+                        proposed_issues.append(proposal)
+                        tool_result = {
+                            "status": "requires_human_review",
+                            "proposal": proposal,
+                        }
+                    elif review_mode and tool_name == "seed_issue":
+                        tool_result = {
+                            "status": "requires_human_review",
+                            "message": "Seeding is blocked until issue creation is approved.",
+                        }
+                    elif (not seed_created_issues) and tool_name == "seed_issue":
+                        tool_result = {
+                            "status": "skipped",
+                            "message": "Seeding is disabled for this run.",
+                        }
+                    else:
+                        with agent_span.start_as_current_observation(
+                            as_type="tool", name=tool_name, input=tool_arguments
+                        ) as tool_span:
+                            try:
+                                tool_result = _dispatch_tool(tool_name, tool_arguments)
+                                tool_span.update(output=tool_result)
+                            except Exception as exc:
+                                tool_span.update(level="ERROR", status_message=str(exc))
+                                raise
+
+                    tool_calls_total += 1
+                    agent_span.update(metadata={"tool_calls_total": tool_calls_total})
+
+                    trace.append(
+                        {
+                            "iteration": iteration + 1,
+                            "tool": tool_name,
+                            "arguments": tool_arguments,
+                            "result": tool_result,
+                        }
+                    )
+
+                    if tool_name == "create_issue" and isinstance(tool_result.get("issue"), dict):
+                        created_issues.append(tool_result["issue"])
+                        if seed_created_issues:
+                            issue_id = tool_result["issue"]["id"]
+                            seed_result = _tool_seed_issue(issue_id, topic)
+                            trace.append(
+                                {
+                                    "iteration": iteration + 1,
+                                    "tool": "seed_issue",
+                                    "arguments": {"issue_id": issue_id, "search_query": topic},
+                                    "result": seed_result,
+                                }
+                            )
+
+                        if len(created_issues) >= target_issue_count:
+                            final_message = (
+                                f"Target reached: created {len(created_issues)} issues for this campaign run."
+                            )
+                            break
+                    
+                    # Track merged duplicates for reporting
+                    if tool_name == "merge_into_issue" and tool_result.get("status") == "merged":
+                        proposed_duplicates.append({
+                            "candidate_info": tool_arguments.get("additional_info", ""),
+                            "existing_issue_id": tool_arguments.get("issue_id"),
+                            "existing_title": tool_result.get("message", ""),
+                            "reason": tool_arguments.get("reason", ""),
+                        })
+
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": json.dumps(tool_result),
+                        }
+                    )
+
+                if final_message.startswith("Target reached"):
+                    break
+                continue
+
+            final_message = assistant_message.content or ""
+            break
+    except Exception as exc:
+        agent_span.update(level="ERROR", status_message=str(exc))
+        raise
+    finally:
+        agent_span.update(
+            output={
+                "created_issues": len(created_issues),
+                "proposed_issues": len(proposed_issues),
+                "final_message": final_message,
+            }
         )
-
-        assistant_message = response.choices[0].message
-        logger.info(f"[RESPONSE] Agent response: {assistant_message.content[:200] if assistant_message.content else '(no content)'}")
-        logger.info(f"[TOOLS] Tool calls: {len(assistant_message.tool_calls) if assistant_message.tool_calls else 0}")
-        assistant_payload: dict[str, Any] = {"role": "assistant", "content": assistant_message.content or ""}
-        if assistant_message.tool_calls:
-            assistant_payload["tool_calls"] = [
-                tool_call.model_dump() if hasattr(tool_call, "model_dump") else tool_call
-                for tool_call in assistant_message.tool_calls
-            ]
-        messages.append(assistant_payload)
-
-        if assistant_message.tool_calls:
-            for tool_call in assistant_message.tool_calls:
-                tool_name = tool_call.function.name
-                tool_arguments = json.loads(tool_call.function.arguments or "{}")
-                
-                logger.info(f"  [EXECUTE] Tool: {tool_name} | Args: {str(tool_arguments)[:150]}")
-
-                if review_mode and tool_name == "create_issue":
-                    proposal = {
-                        "title": tool_arguments.get("title", ""),
-                        "summary": tool_arguments.get("summary", ""),
-                        "why": tool_arguments.get("why", ""),
-                        "search_query": topic,
-                        "reason": "Human review required before issue creation",
-                    }
-                    proposed_issues.append(proposal)
-                    tool_result = {
-                        "status": "requires_human_review",
-                        "proposal": proposal,
-                    }
-                elif review_mode and tool_name == "seed_issue":
-                    tool_result = {
-                        "status": "requires_human_review",
-                        "message": "Seeding is blocked until issue creation is approved.",
-                    }
-                elif (not seed_created_issues) and tool_name == "seed_issue":
-                    tool_result = {
-                        "status": "skipped",
-                        "message": "Seeding is disabled for this run.",
-                    }
-                else:
-                    tool_result = _dispatch_tool(tool_name, tool_arguments)
-
-                trace.append(
-                    {
-                        "iteration": iteration + 1,
-                        "tool": tool_name,
-                        "arguments": tool_arguments,
-                        "result": tool_result,
-                    }
-                )
-
-                if tool_name == "create_issue" and isinstance(tool_result.get("issue"), dict):
-                    created_issues.append(tool_result["issue"])
-                    if seed_created_issues:
-                        issue_id = tool_result["issue"]["id"]
-                        seed_result = _tool_seed_issue(issue_id, topic)
-                        trace.append(
-                            {
-                                "iteration": iteration + 1,
-                                "tool": "seed_issue",
-                                "arguments": {"issue_id": issue_id, "search_query": topic},
-                                "result": seed_result,
-                            }
-                        )
-
-                    if len(created_issues) >= target_issue_count:
-                        final_message = (
-                            f"Target reached: created {len(created_issues)} issues for this campaign run."
-                        )
-                        break
-                
-                # Track merged duplicates for reporting
-                if tool_name == "merge_into_issue" and tool_result.get("status") == "merged":
-                    proposed_duplicates.append({
-                        "candidate_info": tool_arguments.get("additional_info", ""),
-                        "existing_issue_id": tool_arguments.get("issue_id"),
-                        "existing_title": tool_result.get("message", ""),
-                        "reason": tool_arguments.get("reason", ""),
-                    })
-
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": json.dumps(tool_result),
-                    }
-                )
-
-            if final_message.startswith("Target reached"):
-                break
-            continue
-
-        final_message = assistant_message.content or ""
-        break
+        agent_span.end()
 
     logger.info(f"\n{'='*70}")
     logger.info(f"[COMPLETE] Discovery complete:")

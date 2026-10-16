@@ -10,7 +10,7 @@ import json
 import os
 from typing import Any
 
-from openai import OpenAI
+from langfuse.openai import OpenAI
 
 from backend.services import search_service
 from backend.services import perplexity_service

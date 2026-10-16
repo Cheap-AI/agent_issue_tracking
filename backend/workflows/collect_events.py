@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 from typing import Any
 
-from openai import OpenAI
+from langfuse.openai import OpenAI
 
 from backend.core.db import get_session
 from backend.models.db_models import Event

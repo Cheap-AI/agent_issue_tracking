@@ -9,7 +9,7 @@ This agent:
 import os
 from datetime import datetime
 
-from openai import OpenAI
+from langfuse.openai import OpenAI
 
 from backend.core.db import get_session
 from backend.core.knowledge import read_current

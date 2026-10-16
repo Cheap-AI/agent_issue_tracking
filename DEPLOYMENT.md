@@ -81,6 +81,31 @@ npm run dev
 
 In development, the frontend uses `/api` which is proxied to `localhost:8000` by `next.config.js`.
 
+## Local Observability (Langfuse)
+
+Traces for the discovery agent and update_issue workflow are sent to [Langfuse](https://langfuse.com). For local testing, self-host it via Docker as a sibling checkout (not part of this repo):
+
+```bash
+# Outside this repo, e.g. one directory up
+git clone https://github.com/langfuse/langfuse.git
+cd langfuse
+docker compose up
+```
+
+Wait for the `langfuse-web-1` container to log "Ready" (~2-3 min on first run). Then:
+
+1. Open `http://localhost:3000` and sign up / create an organization + project.
+2. Copy the generated public/secret API keys.
+3. Add to this project's `.env`:
+   ```
+   LANGFUSE_PUBLIC_KEY=pk-lf-...
+   LANGFUSE_SECRET_KEY=sk-lf-...
+   LANGFUSE_BASE_URL=http://localhost:3000
+   ```
+4. Run the backend as usual — traces for discovery runs and issue updates will appear under Traces in the Langfuse UI.
+
+Stop the stack with `docker compose down` (add `-v` to also remove its volumes).
+
 ## Environment Variable Discovery
 
 **To find all environment variables used in the codebase:**

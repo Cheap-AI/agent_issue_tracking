@@ -1,7 +1,7 @@
 """Embedding generation service using OpenAI."""
 import os
 
-from openai import OpenAI
+from langfuse.openai import OpenAI
 
 
 # Initialize OpenAI client
