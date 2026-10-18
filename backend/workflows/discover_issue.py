@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import sys
+from collections import Counter
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
@@ -13,6 +14,7 @@ from langfuse import get_client, propagate_attributes
 from backend.agents.discovery.agent import discover_issues
 from backend.agents.ranking.agent import get_leaderboard
 from backend.workflows.discovery_reports import generate_report, save_report, get_discovery_insights, load_recent_reports
+from backend.workflows.monthly_reports import generate_monthly_report, save_monthly_report
 from backend.services.vector_search import search_similar_reports
 from backend.core.db import get_session
 
@@ -102,6 +104,20 @@ def _build_memory_context(topic: str, instruction: str) -> str:
     return "\n".join(context_lines) or "Memory context: No prior discovery or ranking data available."
 
 
+# Picks the (year, month) a discovery run's monthly report should be filed under: the most
+# common target_year/target_month among created issues, falling back to the current UTC month.
+def _infer_report_month(created_issues: list[dict]) -> tuple[int, int]:
+    pairs = [
+        (issue["target_year"], issue["target_month"])
+        for issue in created_issues
+        if issue.get("target_year") and issue.get("target_month")
+    ]
+    if pairs:
+        return Counter(pairs).most_common(1)[0][0]
+    now = datetime.now(timezone.utc)
+    return now.year, now.month
+
+
 # Runs one bounded discovery execution with daily caps and RAG-based memory.
 def discover_issue(
     topic: str = "",
@@ -163,7 +179,15 @@ def discover_issue(
     # Generate and save report to Postgres (with embeddings for future RAG)
     report = generate_report(result, topic, instruction)
     report_id = save_report(report)
-    
+
+    # Append a new versioned monthly report covering this run's (year, month)
+    created_issues = result.get("created_issues", [])
+    report_year, report_month = _infer_report_month(created_issues)
+    monthly = generate_monthly_report(report_year, report_month, created_issues)
+    monthly_report_id = save_monthly_report(
+        report_year, report_month, monthly["overview"], monthly["big_picture"], monthly["metadata"]
+    )
+
     # Get aggregated insights from all past reports
     insights = get_discovery_insights()
     
@@ -194,6 +218,11 @@ def discover_issue(
         "findings_count": len(report["findings"]),
         "proposed_duplicates_count": len(report.get("proposed_duplicates", [])),
         "insights": insights
+    }
+    result["monthly_report"] = {
+        "monthly_report_id": monthly_report_id,
+        "year": report_year,
+        "month": report_month,
     }
     
     # Ensure buffered traces are sent since this often runs as a FastAPI BackgroundTask.

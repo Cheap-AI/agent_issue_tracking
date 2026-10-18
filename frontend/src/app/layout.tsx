@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Navbar } from "@/components/navbar";
+import { ChatWidget } from "@/components/chat-widget";
 
 export const metadata: Metadata = {
   title: "Issue Tracking Platform",
@@ -13,6 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <Navbar />
         {children}
+        <ChatWidget />
       </body>
     </html>
   );

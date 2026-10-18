@@ -26,6 +26,8 @@ def _issue_to_dict(issue: Issue) -> dict[str, Any]:
         "why": issue.why,
         "tags": issue.tags or [],
         "is_active": issue.is_active,
+        "target_year": issue.target_year,
+        "target_month": issue.target_month,
         "created_at": issue.created_at.isoformat() if issue.created_at else _utcnow_iso(),
     }
 
@@ -45,6 +47,8 @@ def create_issue(
     summary: str,
     why: str = "",
     tags: list[str] | None = None,
+    target_year: int | None = None,
+    target_month: int | None = None,
     session: Session | None = None,
 ) -> dict[str, Any]:
     """Create a new issue row. Returns the issue as a dict."""
@@ -59,6 +63,8 @@ def create_issue(
             why=why.strip(),
             tags=tags or [],
             is_active=True,
+            target_year=target_year,
+            target_month=target_month,
         )
         db.add(issue)
         db.flush()
@@ -68,10 +74,19 @@ def create_issue(
     return _run_with_session(session, _create)
 
 
-def list_issues(session: Session | None = None) -> list[dict[str, Any]]:
-    """List all issues, ordered by id."""
+def list_issues(
+    session: Session | None = None,
+    target_year: int | None = None,
+    target_month: int | None = None,
+) -> list[dict[str, Any]]:
+    """List issues, ordered by id. Optionally filter by target_year and/or target_month."""
     def _list(db: Session) -> list[dict[str, Any]]:
-        issues = db.execute(select(Issue).order_by(Issue.id)).scalars().all()
+        query = select(Issue)
+        if target_year is not None:
+            query = query.where(Issue.target_year == target_year)
+        if target_month is not None:
+            query = query.where(Issue.target_month == target_month)
+        issues = db.execute(query.order_by(Issue.id)).scalars().all()
         return [_issue_to_dict(issue) for issue in issues]
 
     return _run_with_session(session, _list)

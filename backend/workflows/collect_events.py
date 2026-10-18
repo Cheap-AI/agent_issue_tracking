@@ -95,7 +95,7 @@ Extract timestamped events from the search results."""
         return {"status": "error", "events_created": 0, "events": [], "error": f"GPT call failed: {e}"}
     
     # Save to database
-    events_created = _save_events_to_db(issue_id, events_data)
+    events_created = save_events_to_db(issue_id, events_data)
     
     return {
         "status": "success",
@@ -105,8 +105,8 @@ Extract timestamped events from the search results."""
     }
 
 
-def _save_events_to_db(issue_id: str, events_data: list[dict]) -> int:
-    """Save extracted events to the database."""
+def save_events_to_db(issue_id: str, events_data: list[dict]) -> int:
+    """Save extracted events to the database. Public: reused by the agentic pipeline's persist step."""
     with get_session() as session:
         count = 0
         for event_dict in events_data:

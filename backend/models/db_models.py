@@ -44,6 +44,8 @@ class Issue(Base):
     why: Mapped[str] = mapped_column(Text, nullable=False, default="")
     tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    target_year: Mapped[int | None] = mapped_column(nullable=True)
+    target_month: Mapped[int | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -244,3 +246,84 @@ class DiscoveryReportChunk(Base):
     )
 
     report: Mapped["DiscoveryReport"] = relationship(back_populates="chunks")
+
+
+class MonthlyReport(Base):
+    """Versioned, immutable per-(year, month) discovery digest.
+
+    One row per version; a new discovery run for a month appends a new version rather than
+    mutating the previous one (mirrors backend/core/versioning.py's Component pattern).
+    """
+    __tablename__ = "monthly_reports"
+    __table_args__ = (
+        UniqueConstraint("year", "month", "version", name="uq_monthly_report_version"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    year: Mapped[int] = mapped_column(nullable=False)
+    month: Mapped[int] = mapped_column(nullable=False)
+    version: Mapped[int] = mapped_column(nullable=False)
+    overview: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    big_picture: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, server_default="{}")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    chunks: Mapped[list["MonthlyReportChunk"]] = relationship(
+        back_populates="report", cascade="all, delete-orphan"
+    )
+
+
+class MonthlyReportChunk(Base):
+    """Chunked and embedded monthly reports for semantic recall by the chat/discovery agents."""
+    __tablename__ = "monthly_report_chunks"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    monthly_report_id: Mapped[int] = mapped_column(
+        ForeignKey("monthly_reports.id", ondelete="CASCADE"), nullable=False
+    )
+    chunk_index: Mapped[int] = mapped_column(nullable=False)
+    chunk_text: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[str] = mapped_column(Text, nullable=False)  # Stored as text, cast to vector(1536) in queries
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    report: Mapped["MonthlyReport"] = relationship(back_populates="chunks")
+
+
+class ChatSession(Base):
+    """A per-browser chat conversation (id is a client-generated UUID string)."""
+    __tablename__ = "chat_sessions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    messages: Mapped[list["ChatMessage"]] = relationship(
+        back_populates="session", cascade="all, delete-orphan"
+    )
+
+
+class ChatMessage(Base):
+    """A single turn in a chat session. tool_calls stores raw tool-call metadata for debugging only."""
+    __tablename__ = "chat_messages"
+    __table_args__ = (
+        CheckConstraint("role IN ('user', 'assistant', 'tool')", name="ck_chat_message_role"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    session_id: Mapped[str] = mapped_column(
+        ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(Text, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    tool_calls: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    session: Mapped["ChatSession"] = relationship(back_populates="messages")

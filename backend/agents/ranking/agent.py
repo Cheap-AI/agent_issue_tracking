@@ -77,13 +77,30 @@ def score_issue(issue_id: str, use_gpt: bool = True) -> dict:
     # Step 4: Calculate overall score based on ranking config
     ranking_config = _get_ranking_config()
     overall_score = _calculate_overall_score(dimension_scores, ranking_config)
-    
-    # Step 5: Update or create tracked_issue record
+
+    rank = upsert_tracked_issue(issue_id, dimension_scores, overall_score, ranking_config["top_n"])
+
+    return {
+        "issue_id": issue_id,
+        "dimension_scores": dimension_scores,
+        "overall_score": round(overall_score, 2),
+        "rank": rank
+    }
+
+
+def upsert_tracked_issue(
+    issue_id: str, dimension_scores: dict, overall_score: float, top_n: int = 50
+) -> int:
+    """Write/update a TrackedIssue row and refresh the top-N leaderboard. Returns the rank.
+
+    Public: shared by score_issue() and the agentic pipeline's persist step, so both paths
+    maintain the leaderboard the same way.
+    """
     with get_session() as session:
         tracked = session.execute(
             select(TrackedIssue).where(TrackedIssue.issue_id == issue_id)
         ).scalar_one_or_none()
-        
+
         if tracked:
             # Update existing
             tracked.dimension_scores = dimension_scores
@@ -100,18 +117,11 @@ def score_issue(issue_id: str, use_gpt: bool = True) -> dict:
                 last_updated_at=datetime.now()
             )
             session.add(tracked)
-        
+
         session.commit()
-    
-    # Step 6: Maintain top-N leaderboard
-    rank = _maintain_leaderboard(ranking_config["top_n"])
-    
-    return {
-        "issue_id": issue_id,
-        "dimension_scores": dimension_scores,
-        "overall_score": round(overall_score, 2),
-        "rank": rank
-    }
+
+    return _maintain_leaderboard(top_n)
+
 
 
 def _score_with_gpt(issue_id: str, summary: str, research: str) -> dict[str, int]:

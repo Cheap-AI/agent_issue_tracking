@@ -6,6 +6,8 @@ class IssueCreateRequest(BaseModel):
     summary: str
     why: str = ""
     tags: list[str] = []
+    target_year: int | None = None
+    target_month: int | None = None
 
 
 class AgentRequest(BaseModel):
@@ -28,3 +30,18 @@ class DiscoveryRequest(BaseModel):
 class UpdateComponentRequest(BaseModel):
     """Request body for updating an issue component."""
     content: str
+
+
+class AgenticPipelineStartRequest(BaseModel):
+    topic: str = ""
+    instruction: str = ""
+
+
+class AgenticPipelineResumeRequest(BaseModel):
+    decision: str  # "approve" | "reject"
+    feedback: str = ""
+
+
+class ChatMessageRequest(BaseModel):
+    message: str
+

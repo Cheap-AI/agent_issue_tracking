@@ -96,9 +96,18 @@ def _tool_create_issue(
     summary: str, 
     why: str = "", 
     tags: list[str] | None = None,
-    dimension_scores: dict[str, int] | None = None
+    dimension_scores: dict[str, int] | None = None,
+    target_year: int | None = None,
+    target_month: int | None = None,
 ) -> dict[str, Any]:
-    issue = create_issue(title=title, summary=summary, why=why, tags=tags or [])
+    issue = create_issue(
+        title=title,
+        summary=summary,
+        why=why,
+        tags=tags or [],
+        target_year=target_year,
+        target_month=target_month,
+    )
     
     # Store embedding for future deduplication
     store_issue_embedding(issue_id=issue["id"], title=title, summary=summary, why=why)
@@ -302,6 +311,16 @@ TOOLS = [
                             "recency": {"type": "integer", "minimum": 1, "maximum": 10}
                         }
                     },
+                    "target_year": {
+                        "type": "integer",
+                        "description": "Calendar year this issue is specifically about (e.g. 2026), only if the topic/instruction specifies a particular month/year. Omit for timeless/autonomous discovery."
+                    },
+                    "target_month": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 12,
+                        "description": "Calendar month (1-12) this issue is specifically about, only if the topic/instruction specifies a particular month/year. Omit for timeless/autonomous discovery."
+                    },
                 },
                 "required": ["title", "summary", "why"],
             },
@@ -352,7 +371,9 @@ def _dispatch_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             arguments["summary"], 
             arguments.get("why", ""),
             arguments.get("tags"),
-            arguments.get("dimension_scores")
+            arguments.get("dimension_scores"),
+            arguments.get("target_year"),
+            arguments.get("target_month"),
         )
     if name == "seed_issue":
         return _tool_seed_issue(arguments["issue_id"], arguments["search_query"])

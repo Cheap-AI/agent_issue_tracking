@@ -4,8 +4,11 @@ load_dotenv()
 
 import logging
 import sys
+import json
+from uuid import uuid4
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 # Configure logging to stdout so we can see it in the terminal
@@ -19,11 +22,15 @@ logger = logging.getLogger(__name__)
 from backend.core.issue import create_issue as create_issue_in_db, get_issue, list_issues, delete_issue as delete_issue_db, list_events_for_issue
 from backend.core.knowledge import update_component
 from backend.core.db import get_db
-from backend.models.schemas import AgentRequest, DiscoveryRequest, IssueCreateRequest, UpdateComponentRequest
+from backend.core.chat import get_or_create_session, list_messages as list_chat_messages
+from backend.agents.chat.agent import stream_chat_response
+from backend.models.schemas import AgentRequest, AgenticPipelineResumeRequest, AgenticPipelineStartRequest, ChatMessageRequest, DiscoveryRequest, IssueCreateRequest, UpdateComponentRequest
 from backend.workflows.discover_issue import discover_issue as discover_issue_workflow
 from backend.workflows.update_issue import update_issue_workflow, quick_update
 from backend.workflows.collect_events import collect_events_for_issue
 from backend.workflows.discovery_reports import load_recent_reports, get_discovery_insights
+from backend.workflows.monthly_reports import get_latest_monthly_report, list_monthly_report_versions
+from backend.workflows.langgraph_agentic_pipeline import get_pipeline_state, resume_pipeline, start_pipeline
 from backend.agents.ranking.agent import get_leaderboard
 from backend.services import search_service
 
@@ -44,6 +51,12 @@ app.add_middleware(
 )
 
 
+@app.get("/")
+def root() -> dict[str, object]:
+    """Root route so platform health checks hitting '/' don't 404."""
+    return {"status": "ok", "service": "python-fastapi"}
+
+
 @app.get("/api/health")
 def health_check() -> dict[str, object]:
     """Next.js 프론트엔드가 연결을 확인할 수 있는 간단한 헬스 체크 엔드포인트입니다."""
@@ -55,9 +68,13 @@ def health_check() -> dict[str, object]:
 
 
 @app.get("/api/issues")
-def get_issues(session: Session = Depends(get_db)) -> dict[str, object]:
-    """저장된 이슈 목록을 반환합니다."""
-    return {"issues": list_issues(session=session)}
+def get_issues(
+    year: int | None = None,
+    month: int | None = None,
+    session: Session = Depends(get_db),
+) -> dict[str, object]:
+    """저장된 이슈 목록을 반환합니다. Optional year/month query params filter by target_year/target_month."""
+    return {"issues": list_issues(session=session, target_year=year, target_month=month)}
 
 
 @app.post("/api/issues", status_code=201)
@@ -69,7 +86,15 @@ def create_issue_endpoint(
     if not payload.title.strip():
         raise HTTPException(status_code=400, detail="Title is required")
 
-    issue = create_issue_in_db(payload.title, payload.summary, payload.why, payload.tags, session=session)
+    issue = create_issue_in_db(
+        payload.title,
+        payload.summary,
+        payload.why,
+        payload.tags,
+        target_year=payload.target_year,
+        target_month=payload.target_month,
+        session=session,
+    )
     return {"issue": issue}
 
 
@@ -367,6 +392,69 @@ def get_discovery_agent_insights() -> dict[str, object]:
         "insights": insights,
         "status": "success" if insights.get("total_reports", 0) > 0 else "no data"
     }
+
+
+@app.get("/api/reports/monthly")
+def get_monthly_report(year: int, month: int) -> dict[str, object]:
+    """Get the latest versioned monthly discovery report for a given (year, month)."""
+    report = get_latest_monthly_report(year, month)
+    if report is None:
+        raise HTTPException(status_code=404, detail="No monthly report found for that year/month")
+    return {"report": report}
+
+
+@app.get("/api/reports/monthly/{year}/{month}/versions")
+def get_monthly_report_versions(year: int, month: int) -> dict[str, object]:
+    """Get the full version history of the monthly discovery report for a given (year, month)."""
+    versions = list_monthly_report_versions(year, month)
+    return {"versions": versions, "count": len(versions)}
+
+
+@app.post("/api/chat/sessions/{session_id}")
+def create_chat_session(session_id: str) -> dict[str, object]:
+    """Create (or return) the chat session with this client-generated id."""
+    return {"session": get_or_create_session(session_id)}
+
+
+@app.get("/api/chat/sessions/{session_id}/messages")
+def get_chat_messages(session_id: str) -> dict[str, object]:
+    """List message history for a chat session, for the widget to hydrate on load."""
+    return {"messages": list_chat_messages(session_id)}
+
+
+@app.post("/api/chat/sessions/{session_id}/messages")
+def post_chat_message(session_id: str, payload: ChatMessageRequest) -> StreamingResponse:
+    """Stream the assistant's reply as newline-delimited JSON events."""
+    def _event_stream():
+        for event in stream_chat_response(session_id, payload.message):
+            yield json.dumps(event) + "\n"
+
+    return StreamingResponse(_event_stream(), media_type="application/x-ndjson")
+
+
+@app.post("/api/agentic-pipeline/start")
+def start_agentic_pipeline(payload: AgenticPipelineStartRequest) -> dict[str, object]:
+    """Start a discover_research -> summarize_rank -> human_review -> persist run.
+
+    Runs synchronously up to the first pause (human_review) or a rejected end state -
+    the underlying agent loop is already a background-safe call, no BackgroundTasks needed.
+    """
+    thread_id = str(uuid4())
+    return start_pipeline(thread_id, topic=payload.topic.strip(), instruction=payload.instruction.strip())
+
+
+@app.get("/api/agentic-pipeline/{thread_id}")
+def get_agentic_pipeline_status(thread_id: str) -> dict[str, object]:
+    """Get a pipeline run's current status, including the pending human-review payload if any."""
+    return get_pipeline_state(thread_id)
+
+
+@app.post("/api/agentic-pipeline/{thread_id}/resume")
+def resume_agentic_pipeline(thread_id: str, payload: AgenticPipelineResumeRequest) -> dict[str, object]:
+    """Resume a paused run with a human decision ('approve' persists the draft, 'reject' discards it)."""
+    if payload.decision not in ("approve", "reject"):
+        raise HTTPException(status_code=400, detail="decision must be 'approve' or 'reject'")
+    return resume_pipeline(thread_id, decision=payload.decision, feedback=payload.feedback)
 
 
 @app.post("/api/agent/research")

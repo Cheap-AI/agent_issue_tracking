@@ -58,6 +58,12 @@ Your purpose is to **explore, identify, and create** issues worth tracking. You 
      - Focus on the core problem, not when it was discovered
    - **Summary**: Evidence-based description of the issue
    - **Why**: Explain why this matters and why it should be tracked
+   - **target_year / target_month**: If the topic/instruction specifies a particular calendar
+     month or year (e.g. "issues in September 2026", "news in 2026 September"), extract it and
+     pass `target_year` (e.g. 2026) and `target_month` (1-12, e.g. 9) when calling `create_issue`.
+     These are structured fields, separate from the title - still NEVER put the year in the
+     title string itself. If the discovery run is autonomous/timeless (no specific month/year
+     mentioned), omit both fields (they default to null).
    - **Tags** (ARRAY of individual tags, NOT concatenated strings):
      - Each tag is a separate array element
      - Use single words or hyphenated phrases only
