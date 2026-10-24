@@ -15,8 +15,10 @@ from collections import Counter
 from datetime import datetime
 from typing import Any
 
+from sqlalchemy import text
+
 from backend.core.db import get_session
-from backend.models.db_models import DiscoveryReport, DiscoveryReportChunk
+from backend.models.db_models import DiscoveryReport
 from backend.services.chunking import chunk_text
 from backend.services.embedding import generate_embeddings_batch
 
@@ -289,20 +291,27 @@ def save_report(report: dict[str, Any]) -> int:
     chunks = chunk_text(digest_text)
     if chunks:
         embeddings = generate_embeddings_batch(chunks)
-        
-        # Store chunks with embeddings
+
+        # Raw SQL with explicit vector cast - ORM bulk-insert sends embedding as ::TEXT,
+        # which Postgres rejects for a vector(1536) column across multi-row batches.
+        insert_sql = text(
+            """
+            INSERT INTO discovery_report_chunks (report_id, chunk_index, chunk_text, embedding)
+            VALUES (:report_id, :chunk_index, :chunk_text, CAST(:embedding AS vector))
+            """
+        )
         with get_session() as session:
             for chunk_index, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
                 embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
-                
-                chunk_obj = DiscoveryReportChunk(
-                    report_id=report_id,
-                    chunk_index=chunk_index,
-                    chunk_text=chunk,
-                    embedding=embedding_str
+                session.execute(
+                    insert_sql,
+                    {
+                        "report_id": report_id,
+                        "chunk_index": chunk_index,
+                        "chunk_text": chunk,
+                        "embedding": embedding_str,
+                    },
                 )
-                session.add(chunk_obj)
-            
             session.commit()
     
     return report_id

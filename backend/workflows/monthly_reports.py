@@ -16,7 +16,7 @@ from typing import Any
 from sqlalchemy import func, select, text
 
 from backend.core.db import get_session
-from backend.models.db_models import DiscoveryReport, MonthlyReport, MonthlyReportChunk
+from backend.models.db_models import DiscoveryReport, MonthlyReport
 from backend.services.chunking import chunk_text
 from backend.services.embedding import generate_embeddings_batch
 
@@ -182,16 +182,25 @@ def save_monthly_report(year: int, month: int, overview: str, big_picture: str, 
     chunks = chunk_text(digest_text)
     if chunks:
         embeddings = generate_embeddings_batch(chunks)
+        # Raw SQL with explicit vector cast - ORM bulk-insert sends embedding as ::TEXT,
+        # which Postgres rejects for a vector(1536) column across multi-row batches.
+        insert_sql = text(
+            """
+            INSERT INTO monthly_report_chunks (monthly_report_id, chunk_index, chunk_text, embedding)
+            VALUES (:monthly_report_id, :chunk_index, :chunk_text, CAST(:embedding AS vector))
+            """
+        )
         with get_session() as session:
             for chunk_index, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
                 embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
-                session.add(
-                    MonthlyReportChunk(
-                        monthly_report_id=report_id,
-                        chunk_index=chunk_index,
-                        chunk_text=chunk,
-                        embedding=embedding_str,
-                    )
+                session.execute(
+                    insert_sql,
+                    {
+                        "monthly_report_id": report_id,
+                        "chunk_index": chunk_index,
+                        "chunk_text": chunk,
+                        "embedding": embedding_str,
+                    },
                 )
             session.commit()
 
