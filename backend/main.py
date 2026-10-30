@@ -2,9 +2,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from backend.telemetry import setup_langfuse, instrument_app
+
+langfuse_client = setup_langfuse()  # before any get_client() at import time below
+
 import logging
 import sys
 import json
+from contextlib import asynccontextmanager
 from uuid import uuid4
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,7 +40,14 @@ from backend.agents.ranking.agent import get_leaderboard
 from backend.services import search_service
 
 # FastAPI 앱을 생성합니다.
-app = FastAPI(title="Issue Tracking API")  # python -m uvicorn backend.main:app --reload
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    yield
+    langfuse_client.shutdown()  # flush buffered traces on redeploy/restart
+
+
+app = FastAPI(title="Issue Tracking API", lifespan=lifespan)  # python -m uvicorn backend.main:app --reload
+instrument_app(app)
 
 app.add_middleware(
     CORSMiddleware,

@@ -345,7 +345,10 @@ def stream_chat_response(session_id: str, user_message: str) -> Generator[dict[s
     messages = _history_to_messages(session_id)  # includes the user message just persisted above
 
     agent_span = langfuse.start_observation(
-        as_type="agent", name="chat_turn", input={"session_id": session_id, "user_message": user_message}
+        as_type="agent",
+        name="chat_turn",
+        input={"session_id": session_id, "user_message": user_message},
+        metadata={"session_id": session_id},
     )
     final_text = ""
     executed_tool_calls: list[dict[str, Any]] = []
@@ -431,6 +434,7 @@ def stream_chat_response(session_id: str, user_message: str) -> Generator[dict[s
         raise
     finally:
         agent_span.update(output={"final_text": final_text})
+        agent_span.end()
 
     append_message(session_id, "assistant", final_text, tool_calls=executed_tool_calls or None)
     yield {"type": "done"}
