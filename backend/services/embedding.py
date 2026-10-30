@@ -1,11 +1,11 @@
 """Embedding generation service using OpenAI."""
 import os
 
-from langfuse.openai import OpenAI
+from backend.core.llm import get_openai_client
 
 
 # Initialize OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = get_openai_client()
 
 
 def generate_embedding(text: str) -> list[float]:

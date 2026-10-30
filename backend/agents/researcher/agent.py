@@ -10,7 +10,7 @@ import json
 import os
 from typing import Any
 
-from langfuse.openai import OpenAI
+from backend.core.llm import get_openai_client
 
 from backend.services import search_service
 from backend.services import perplexity_service
@@ -19,7 +19,7 @@ from backend.models.db_models import Event
 from backend.core.issue import get_issue
 
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = get_openai_client()
 DEFAULT_MODEL = os.getenv("OPENAI_EVENTS_MODEL", "gpt-4o-mini")
 
 

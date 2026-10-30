@@ -14,9 +14,9 @@ import json
 import os
 from typing import Any
 
-from langfuse.openai import OpenAI
+from backend.core.llm import get_openai_client
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = get_openai_client()
 DEFAULT_MODEL = os.getenv("OPENAI_JUDGE_MODEL", "gpt-4o-mini")
 
 

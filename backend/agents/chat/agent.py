@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 from typing import Any, Generator
 
-from langfuse.openai import OpenAI
+from backend.core.llm import get_openai_client, load_prompt
 from langfuse import get_client
 
 from backend.core.chat import append_message, get_or_create_session, list_messages
@@ -32,7 +32,7 @@ from backend.workflows.monthly_reports import get_latest_monthly_report, list_mo
 
 logger = logging.getLogger(__name__)
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = get_openai_client()
 langfuse = get_client()
 
 PROMPT_PATH = Path(__file__).resolve().parents[2] / "prompts" / "chat" / "system_prompt.md"
@@ -41,11 +41,12 @@ MAX_TOOL_ROUNDS = 4
 
 
 def _load_system_prompt() -> str:
-    if PROMPT_PATH.exists():
-        return PROMPT_PATH.read_text(encoding="utf-8")
-    return (
-        "You are a helpful assistant over this issue-tracking platform's knowledge base. "
-        "Use the available tools to answer questions, and keep answers concise."
+    return load_prompt(
+        PROMPT_PATH,
+        (
+            "You are a helpful assistant over this issue-tracking platform's knowledge base. "
+            "Use the available tools to answer questions, and keep answers concise."
+        ),
     )
 
 

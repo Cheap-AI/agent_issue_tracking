@@ -52,8 +52,10 @@ pytest -k "test_name"       # run a single test
 
 ### Backend (`backend/`)
 
-- **`main.py`** — FastAPI app. All API routes are defined here. Long-running work is dispatched via `BackgroundTasks`.
-- **`core/`** — Database access layer: `issue.py` (CRUD), `chat.py`, `knowledge.py` (issue components + background embeddings), `db.py` (SQLAlchemy session/engine), `versioning.py`, `job_registry.py`.
+- **`main.py`** — FastAPI app setup only (CORS, lifespan, health routes, router registration). Long-running work is dispatched via `BackgroundTasks`.
+- **`routers/`** — API routes grouped by area: `issues`, `discovery` (incl. leaderboard), `reports`, `chat`, `agentic`.
+- **`telemetry.py`** — Langfuse client + OpenTelemetry FastAPI instrumentation (set up before other imports in `main.py`).
+- **`core/`** — Database access layer: `issue.py` (CRUD), `chat.py`, `knowledge.py` (issue components + background embeddings), `db.py` (SQLAlchemy session/engine), `llm.py` (shared OpenAI client + `load_prompt`), `versioning.py`, `job_registry.py`.
 - **`models/`** — `db_models.py` (SQLAlchemy ORM), `schemas.py` (Pydantic request bodies).
 - **`workflows/`** — Multi-step orchestration:
   - `discover_issue.py` — autonomous topic discovery loop using Tavily/Perplexity; writes issues to DB.

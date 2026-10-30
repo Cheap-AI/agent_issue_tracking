@@ -9,7 +9,7 @@ This agent:
 import os
 from datetime import datetime
 
-from langfuse.openai import OpenAI
+from backend.core.llm import get_openai_client
 
 from backend.core.db import get_session
 from backend.core.knowledge import read_current
@@ -20,7 +20,7 @@ import json
 
 
 # Initialize OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = get_openai_client()
 
 
 SYSTEM_PROMPT = """You are a ranking agent for an AI-native Issue Intelligence Platform.

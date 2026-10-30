@@ -13,7 +13,7 @@ import logging
 import os
 from typing import Any
 
-from langfuse.openai import OpenAI
+from backend.core.llm import get_openai_client
 from langfuse import get_client
 
 from backend.core.issue import get_issue, list_issues
@@ -23,7 +23,7 @@ from backend.services.vector_search import search_similar_issues_by_text
 
 logger = logging.getLogger(__name__)
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = get_openai_client()
 langfuse = get_client()
 
 DEFAULT_MODEL = os.getenv("OPENAI_DISCOVER_RESEARCH_MODEL", os.getenv("OPENAI_DISCOVERY_MODEL", "gpt-4o"))

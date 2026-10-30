@@ -13,11 +13,11 @@ import json
 import os
 from typing import Any
 
-from langfuse.openai import OpenAI
+from backend.core.llm import get_openai_client
 
 from backend.core.global_docs import get_doc
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = get_openai_client()
 DEFAULT_MODEL = os.getenv("OPENAI_SUMMARIZE_RANK_MODEL", "gpt-4o")
 
 DEFAULT_RANKING_CONFIG = {

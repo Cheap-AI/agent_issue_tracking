@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from langfuse.openai import OpenAI
+from backend.core.llm import get_openai_client, load_prompt
 from langfuse import get_client
 
 from backend.core.issue import create_issue, get_issue, list_issues
@@ -28,7 +28,7 @@ from backend.agents.ranking.agent import score_issue
 logger = logging.getLogger(__name__)
 
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = get_openai_client()
 langfuse = get_client()
 
 PROMPT_PATH = Path(__file__).resolve().parents[2] / "prompts" / "discovery" / "system_prompt.md"
@@ -37,11 +37,12 @@ DEFAULT_MODEL = os.getenv("OPENAI_DISCOVERY_MODEL", "gpt-4o")  # Use gpt-4o for 
 
 # Loads the discovery system prompt from disk with a safe fallback.
 def _load_system_prompt() -> str:
-    if PROMPT_PATH.exists():
-        return PROMPT_PATH.read_text(encoding="utf-8")
-    return (
-        "You are a discovery agent. Search for candidate issues, inspect current issues, "
-        "and create only high-confidence new issues."
+    return load_prompt(
+        PROMPT_PATH,
+        (
+            "You are a discovery agent. Search for candidate issues, inspect current issues, "
+            "and create only high-confidence new issues."
+        ),
     )
 
 

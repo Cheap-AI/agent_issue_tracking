@@ -4,6 +4,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 import backend.main as main_module
+from backend.services import search_service
 from backend.core.issue import create_issue
 
 
@@ -42,8 +43,8 @@ class ApiTests(unittest.TestCase):
         fake_results = [
             {"title": "Fake Title", "url": "https://example.com/a", "content": "Fake content A"},
         ]
-        with patch.object(main_module.search_service, "is_configured", return_value=True), \
-                patch.object(main_module.search_service, "search", return_value=fake_results):
+        with patch.object(search_service, "is_configured", return_value=True), \
+                patch.object(search_service, "search", return_value=fake_results):
             response = self.client.post("/api/agent/research", json={"topic": "mock topic"})
 
         self.assertEqual(response.status_code, 200)
@@ -52,7 +53,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(payload["sources"], ["https://example.com/a"])
 
     def test_research_endpoint_not_configured(self) -> None:
-        with patch.object(main_module.search_service, "is_configured", return_value=False):
+        with patch.object(search_service, "is_configured", return_value=False):
             response = self.client.post("/api/agent/research", json={"topic": "no key topic"})
 
         self.assertEqual(response.status_code, 200)
