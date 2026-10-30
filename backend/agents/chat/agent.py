@@ -348,6 +348,7 @@ def stream_chat_response(session_id: str, user_message: str) -> Generator[dict[s
         as_type="agent", name="chat_turn", input={"session_id": session_id, "user_message": user_message}
     )
     final_text = ""
+    executed_tool_calls: list[dict[str, Any]] = []
     try:
         for _round in range(MAX_TOOL_ROUNDS):
             stream = client.chat.completions.create(
@@ -412,6 +413,14 @@ def stream_chat_response(session_id: str, user_message: str) -> Generator[dict[s
                     except Exception as exc:
                         tool_span.update(level="ERROR", status_message=str(exc))
                         tool_result = {"error": str(exc)}
+                executed_tool_calls.append(
+                    {
+                        "id": entry["id"],
+                        "name": entry["name"],
+                        "arguments": tool_arguments,
+                        "error": tool_result.get("error") if isinstance(tool_result, dict) else None,
+                    }
+                )
                 messages.append(
                     {"role": "tool", "tool_call_id": entry["id"], "content": json.dumps(tool_result)}
                 )
@@ -423,5 +432,5 @@ def stream_chat_response(session_id: str, user_message: str) -> Generator[dict[s
     finally:
         agent_span.update(output={"final_text": final_text})
 
-    append_message(session_id, "assistant", final_text)
+    append_message(session_id, "assistant", final_text, tool_calls=executed_tool_calls or None)
     yield {"type": "done"}
