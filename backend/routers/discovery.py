@@ -143,11 +143,11 @@ def get_discovery_agent_insights() -> dict[str, object]:
     Returns:
         - total_reports: Number of discovery reports
         - total_issues_created: Total issues created across all runs
-        - api_calls: Breakdown of Tavily vs Perplexity usage
+        - api_calls: Breakdown of Tavily vs Exa usage
         - average_issues_per_run: Average issues per discovery run
         - most_effective_queries: Top search queries used
         - most_common_tags: Most frequently used tags
-        - api_preference: Ratio of Tavily to Perplexity usage
+        - api_preference: Ratio of Tavily to Exa usage
     """
     insights = get_discovery_insights()
     return {

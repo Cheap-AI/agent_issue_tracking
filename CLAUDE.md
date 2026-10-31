@@ -58,7 +58,7 @@ pytest -k "test_name"       # run a single test
 - **`core/`** — Database access layer: `issue.py` (CRUD), `chat.py`, `knowledge.py` (issue components + background embeddings), `db.py` (SQLAlchemy session/engine), `llm.py` (shared OpenAI client + `load_prompt`), `versioning.py`, `job_registry.py`.
 - **`models/`** — `db_models.py` (SQLAlchemy ORM), `schemas.py` (Pydantic request bodies).
 - **`workflows/`** — Multi-step orchestration:
-  - `discover_issue.py` — autonomous topic discovery loop using Tavily/Perplexity; writes issues to DB.
+  - `discover_issue.py` — autonomous topic discovery loop using Tavily/Exa; writes issues to DB.
   - `update_issue.py` — `quick_update` runs research → summary → ranking in sequence.
   - `langgraph_agentic_pipeline.py` — LangGraph `StateGraph` with human-in-the-loop via `interrupt()`. Stages: discover_research → judge → summarize_rank → judge → human review → persist. Uses in-memory checkpointing (runs lost on restart).
   - `collect_events.py`, `discovery_reports.py`, `monthly_reports.py` — supporting workflows.
@@ -70,7 +70,7 @@ pytest -k "test_name"       # run a single test
   - `ranking/` — scores issues, updates leaderboard (`leaderboard.json`), manages `tracked_issues`.
   - `researcher/` — deep research on a single issue.
   - `summarize_rank/` — generates executive summary then ranks.
-- **`services/`** — `embedding.py` (OpenAI `text-embedding-3-small`), `vector_search.py` (pgvector), `search_service.py` (Tavily), `perplexity_service.py`, `chunking.py`.
+- **`services/`** — `embedding.py` (OpenAI `text-embedding-3-small`), `vector_search.py` (pgvector), `search_service.py` (Tavily), `exa_service.py`, `chunking.py`.
 - **`prompts/`** — Markdown system prompts for discovery and chat agents.
 - **`storage/global/`** — Shared markdown files for ranking rubric and taxonomy, read at runtime.
 - **`migrations/`** — Alembic migration scripts. Current schema includes: issues, events, tracked_issues (with tags, why, target_date), embeddings, RAG tables, monthly reports, chat tables.
@@ -81,7 +81,7 @@ Next.js 16 / React 19 / TypeScript / Tailwind CSS app. The `frontend/app/` direc
 
 ### Environment variables
 
-Copy `.env.example` to `.env`. Required keys: `DATABASE_URL`, `OPENAI_API_KEY`, `TAVILY_API_KEY`. Optional: `PERPLEXITY_API_KEY`, `LANGFUSE_*` (for observability via self-hosted Langfuse), `OPENAI_DISCOVERY_MODEL`.
+Copy `.env.example` to `.env`. Required keys: `DATABASE_URL`, `OPENAI_API_KEY`, `TAVILY_API_KEY`. Optional: `EXA_API_KEY`, `GEMINI_API_KEY` (bulk agents use Gemini when set; chat and embeddings stay on OpenAI), `LANGFUSE_*` (for observability via self-hosted Langfuse), `OPENAI_DISCOVERY_MODEL`.
 
 ### Observability
 

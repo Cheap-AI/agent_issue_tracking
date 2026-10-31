@@ -1,7 +1,7 @@
 """Discovery agent reporting and RAG storage.
 
 Generates structured reports from discovery runs including:
-- Tavily and Perplexity API call counts
+- Tavily and Exa API call counts
 - Search queries and strategies
 - Issues created with reasoning
 - Proposed duplicates (semantic similarity 0.75-0.9)
@@ -158,7 +158,7 @@ def generate_report(
     
     # Count API calls
     tavily_calls = []
-    perplexity_calls = []
+    exa_calls = []
     search_queries = []
     
     for entry in trace:
@@ -168,11 +168,11 @@ def generate_report(
             tavily_calls.append({"query": query, "results": results_count})
             search_queries.append({"engine": "tavily", "query": query})
         
-        elif entry.get("tool") == "search_perplexity":
+        elif entry.get("tool") == "search_exa":
             query = entry.get("arguments", {}).get("query", "")
             results_count = len(entry.get("result", {}).get("results", []))
-            perplexity_calls.append({"query": query, "results": results_count})
-            search_queries.append({"engine": "perplexity", "query": query})
+            exa_calls.append({"query": query, "results": results_count})
+            search_queries.append({"engine": "exa", "query": query})
     
     # Build findings summary
     findings = []
@@ -210,14 +210,14 @@ def generate_report(
                 "queries": tavily_calls,
                 "total_results": sum(q.get("results", 0) for q in tavily_calls)
             },
-            "perplexity": {
-                "calls": len(perplexity_calls),
-                "queries": perplexity_calls,
-                "total_results": sum(q.get("results", 0) for q in perplexity_calls)
+            "exa": {
+                "calls": len(exa_calls),
+                "queries": exa_calls,
+                "total_results": sum(q.get("results", 0) for q in exa_calls)
             },
             "total_searches": len(search_queries),
             "search_strategy": {
-                "tavily_vs_perplexity": f"{len(tavily_calls)} Tavily vs {len(perplexity_calls)} Perplexity",
+                "tavily_vs_exa": f"{len(tavily_calls)} Tavily vs {len(exa_calls)} Exa",
                 "queries": search_queries
             }
         },
@@ -364,14 +364,14 @@ def get_discovery_insights() -> dict[str, Any]:
         return {"message": "No discovery reports found"}
     
     total_tavily = sum(r.api_usage["tavily"]["calls"] for r in reports)
-    total_perplexity = sum(r.api_usage["perplexity"]["calls"] for r in reports)
+    total_exa = sum(r.api_usage.get("exa", {}).get("calls", 0) for r in reports)
     total_issues = sum(r.actual_created for r in reports)
     
     # Most common queries
     all_queries = []
     for r in reports:
         all_queries.extend([q["query"] for q in r.api_usage["tavily"]["queries"]])
-        all_queries.extend([q["query"] for q in r.api_usage["perplexity"]["queries"]])
+        all_queries.extend([q["query"] for q in r.api_usage.get("exa", {}).get("queries", [])])
     
     # Most common tags in created issues
     all_tags = []
@@ -382,18 +382,18 @@ def get_discovery_insights() -> dict[str, Any]:
     tag_frequency = Counter(all_tags)
     query_frequency = Counter(all_queries)
     
-    total_calls = total_tavily + total_perplexity
+    total_calls = total_tavily + total_exa
     
     return {
         "total_reports": len(reports),
         "total_issues_created": total_issues,
         "api_calls": {
             "tavily": total_tavily,
-            "perplexity": total_perplexity,
+            "exa": total_exa,
             "total": total_calls
         },
         "average_issues_per_run": total_issues / len(reports) if reports else 0,
         "most_effective_queries": [q for q, _ in query_frequency.most_common(5)],
         "most_common_tags": dict(tag_frequency.most_common(10)),
-        "api_preference": f"{total_tavily / total_calls * 100:.1f}% Tavily, {total_perplexity / total_calls * 100:.1f}% Perplexity" if total_calls > 0 else "No data"
+        "api_preference": f"{total_tavily / total_calls * 100:.1f}% Tavily, {total_exa / total_calls * 100:.1f}% Exa" if total_calls > 0 else "No data"
     }

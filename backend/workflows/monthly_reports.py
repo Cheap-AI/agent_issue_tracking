@@ -99,7 +99,7 @@ def _build_overview(year: int, month: int, created_issues: list[dict]) -> tuple[
         total_runs = len(rows)
         total_created = sum(row.actual_created for row in rows)
         total_tavily = sum((row.api_usage or {}).get("tavily", {}).get("calls", 0) for row in rows)
-        total_perplexity = sum((row.api_usage or {}).get("perplexity", {}).get("calls", 0) for row in rows)
+        total_exa = sum((row.api_usage or {}).get("exa", {}).get("calls", 0) for row in rows)
 
         all_tags: list[str] = []
         for row in rows:
@@ -111,7 +111,7 @@ def _build_overview(year: int, month: int, created_issues: list[dict]) -> tuple[
     metadata = {
         "total_runs": total_runs,
         "total_issues_created": total_created,
-        "api_calls": {"tavily": total_tavily, "perplexity": total_perplexity},
+        "api_calls": {"tavily": total_tavily, "exa": total_exa},
         "top_tags": top_tags,
     }
 
@@ -120,7 +120,7 @@ def _build_overview(year: int, month: int, created_issues: list[dict]) -> tuple[
         "",
         f"- Discovery runs this month: {total_runs}",
         f"- Issues created this month: {total_created}",
-        f"- API usage: {total_tavily} Tavily calls, {total_perplexity} Perplexity calls",
+        f"- API usage: {total_tavily} Tavily calls, {total_exa} Exa calls",
     ]
     if top_tags:
         lines.append(f"- Common themes: {', '.join(top_tags)}")

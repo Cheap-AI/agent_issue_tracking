@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 from typing import Any
 
-from backend.core.llm import get_openai_client
+from backend.core.llm import bulk_model, get_bulk_client
 
 from backend.core.db import get_session
 from backend.models.db_models import Event
@@ -12,8 +12,8 @@ from backend.services import search_service
 from backend.core.issue import get_issue
 
 
-client = get_openai_client()
-DEFAULT_MODEL = os.getenv("OPENAI_EVENTS_MODEL", "gpt-4o-mini")
+client = get_bulk_client()
+DEFAULT_MODEL = bulk_model("OPENAI_EVENTS_MODEL", "gpt-4o-mini")
 
 SYSTEM_PROMPT = """You are an events researcher for an Issue Intelligence Platform.
 

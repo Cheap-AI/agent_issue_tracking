@@ -12,7 +12,8 @@
    - `DATABASE_URL` - Your Supabase Postgres connection string
    - `OPENAI_API_KEY` - OpenAI API key for embeddings and LLM
    - `TAVILY_API_KEY` - Tavily API key for web search
-   - `PERPLEXITY_API_KEY` - (Optional) Perplexity API key
+   - `EXA_API_KEY` - (Optional) Exa API key for web search
+   - `GEMINI_API_KEY` - (Optional) Gemini API key; bulk agents use it when set
 
 3. **Note your backend URL:**
    - Example: `https://agent-issue-tracking.onrender.com`

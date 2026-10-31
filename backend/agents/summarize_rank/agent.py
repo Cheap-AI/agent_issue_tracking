@@ -13,12 +13,12 @@ import json
 import os
 from typing import Any
 
-from backend.core.llm import get_openai_client
+from backend.core.llm import bulk_model, get_bulk_client
 
 from backend.core.global_docs import get_doc
 
-client = get_openai_client()
-DEFAULT_MODEL = os.getenv("OPENAI_SUMMARIZE_RANK_MODEL", "gpt-4o")
+client = get_bulk_client()
+DEFAULT_MODEL = bulk_model("OPENAI_SUMMARIZE_RANK_MODEL", "gpt-4o")
 
 DEFAULT_RANKING_CONFIG = {
     "top_n": 50,

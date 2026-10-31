@@ -10,17 +10,17 @@ import json
 import os
 from typing import Any
 
-from backend.core.llm import get_openai_client
+from backend.core.llm import bulk_model, get_bulk_client
 
 from backend.services import search_service
-from backend.services import perplexity_service
+from backend.services import exa_service
 from backend.core.db import get_session
 from backend.models.db_models import Event
 from backend.core.issue import get_issue
 
 
-client = get_openai_client()
-DEFAULT_MODEL = os.getenv("OPENAI_EVENTS_MODEL", "gpt-4o-mini")
+client = get_bulk_client()
+DEFAULT_MODEL = bulk_model("OPENAI_EVENTS_MODEL", "gpt-4o-mini")
 
 
 SYSTEM_PROMPT = """You are an events researcher for an Issue Intelligence Platform.
@@ -52,7 +52,7 @@ def collect_events_for_issue(
     issue_id: str,
     search_query: str | None = None,
     max_results: int = 10,
-    use_perplexity: bool = False
+    use_exa: bool = False
 ) -> dict[str, Any]:
     """Research and collect events for an issue.
     
@@ -60,7 +60,7 @@ def collect_events_for_issue(
         issue_id: Issue ID to collect events for
         search_query: Custom search query (uses issue title if not provided)
         max_results: Max search results (default 10)
-        use_perplexity: Use Perplexity for research-focused search (default False = Tavily)
+        use_exa: Use Exa for research-focused search (default False = Tavily)
         
     Returns:
         Dict with keys: status, events_created, events, search_results_count, error (if any)
@@ -79,16 +79,16 @@ def collect_events_for_issue(
         search_query = f"{issue['title']} events announcements incidents"
     
     # Choose search service
-    if use_perplexity:
-        if not perplexity_service.is_configured():
+    if use_exa:
+        if not exa_service.is_configured():
             return {
                 "status": "error",
                 "events_created": 0,
                 "events": [],
-                "error": "Perplexity API not configured. Add PERPLEXITY_API_KEY to .env"
+                "error": "Exa API not configured. Add EXA_API_KEY to .env"
             }
-        search_fn = lambda q: perplexity_service.search(q)
-        service_name = "Perplexity"
+        search_fn = lambda q: exa_service.search(q)
+        service_name = "Exa"
     else:
         if not search_service.is_configured():
             return {

@@ -13,7 +13,9 @@ services:
         sync: false
       - key: TAVILY_API_KEY
         sync: false
-      - key: PERPLEXITY_API_KEY
+      - key: EXA_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
         sync: false
       - key: LANGFUSE_PUBLIC_KEY
         sync: false

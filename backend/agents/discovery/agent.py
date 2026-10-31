@@ -14,12 +14,12 @@ import os
 from pathlib import Path
 from typing import Any
 
-from backend.core.llm import get_openai_client, load_prompt
+from backend.core.llm import bulk_model, get_bulk_client, load_prompt
 from langfuse import get_client
 
 from backend.core.issue import create_issue, get_issue, list_issues
 from backend.services import search_service
-from backend.services import perplexity_service
+from backend.services import exa_service
 from backend.services.vector_search import search_similar_issues_by_text, store_issue_embedding
 from backend.workflows.update_issue import quick_update
 from backend.agents.ranking.agent import score_issue
@@ -28,14 +28,11 @@ from backend.agents.ranking.agent import score_issue
 logger = logging.getLogger(__name__)
 
 
-client = get_openai_client()
+client = get_bulk_client()
 langfuse = get_client()
 
 PROMPT_PATH = Path(__file__).resolve().parents[2] / "prompts" / "discovery" / "system_prompt.md"
-DEFAULT_MODEL = os.getenv("OPENAI_DISCOVERY_MODEL", "gpt-4o")  # Use gpt-4o for better reasoning (was gpt-4o-mini)
-
-
-# Loads the discovery system prompt from disk with a safe fallback.
+DEFAULT_MODEL = bulk_model("OPENAI_DISCOVERY_MODEL", "gpt-4o")
 def _load_system_prompt() -> str:
     return load_prompt(
         PROMPT_PATH,
@@ -54,26 +51,26 @@ def _tool_search_tavily(query: str, max_results: int = 10) -> dict[str, Any]:
     }
 
 
-# Perplexity tool wrapper for research-focused search with citations.
-def _tool_search_perplexity(query: str) -> dict[str, Any]:
-    if not perplexity_service.is_configured():
+# Exa tool wrapper for research-focused web search with page text and source URLs.
+def _tool_search_exa(query: str) -> dict[str, Any]:
+    if not exa_service.is_configured():
         return {
             "query": query,
             "results": [],
-            "error": "Perplexity API not configured. Add PERPLEXITY_API_KEY to .env"
+            "error": "Exa API not configured. Add EXA_API_KEY to .env"
         }
     try:
         return {
             "query": query,
-            "results": perplexity_service.search(query),
+            "results": exa_service.search(query),
         }
     except Exception as e:
-        # Gracefully handle Perplexity failures - log but don't crash
-        logger.warning(f"Perplexity search failed for '{query}': {str(e)}")
+        # Gracefully handle Exa failures - log but don't crash
+        logger.warning(f"Exa search failed for '{query}': {str(e)}")
         return {
             "query": query,
             "results": [],
-            "error": f"Perplexity search failed: {str(e)[:100]}"
+            "error": f"Exa search failed: {str(e)[:100]}"
         }
 
 
@@ -207,8 +204,8 @@ TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "search_perplexity",
-            "description": "Deep research with authoritative citations. Use when creating issues (you need factual evidence), fact-checking claims, or need comprehensive analysis. Higher quality but slower. PREFER THIS when validating issue significance.",
+            "name": "search_exa",
+            "description": "Neural web search (Exa) returning source URLs with page text. Use when creating issues (you need factual evidence), fact-checking claims, or need authoritative sources. PREFER THIS when validating issue significance.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -349,8 +346,8 @@ TOOLS = [
 def _dispatch_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     if name == "search_tavily":
         return _tool_search_tavily(arguments["query"], int(arguments.get("max_results", 10)))
-    if name == "search_perplexity":
-        return _tool_search_perplexity(arguments["query"])
+    if name == "search_exa":
+        return _tool_search_exa(arguments["query"])
     if name == "list_issues":
         return _tool_list_issues()
     if name == "get_issue":

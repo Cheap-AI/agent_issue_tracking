@@ -54,9 +54,9 @@ def print_report_summary(report: dict[str, Any], index: int = 1) -> None:
     
     print(f"\n📊 API Usage:")
     tavily = api_usage.get("tavily", {})
-    perplexity = api_usage.get("perplexity", {})
+    exa = api_usage.get("exa", {})
     print(f"   Tavily: {tavily.get('calls')} calls → {tavily.get('total_results')} results")
-    print(f"   Perplexity: {perplexity.get('calls')} calls → {perplexity.get('total_results')} results")
+    print(f"   Exa: {exa.get('calls')} calls → {exa.get('total_results')} results")
     print(f"   Total Searches: {api_usage.get('total_searches')}")
     
     search_strat = api_usage.get("search_strategy", {})
@@ -105,7 +105,7 @@ def print_insights(insights: dict[str, Any]) -> None:
     api_calls = insights.get("api_calls", {})
     print(f"\n🔧 API Usage:")
     print(f"   Tavily Calls: {api_calls.get('tavily', 0)}")
-    print(f"   Perplexity Calls: {api_calls.get('perplexity', 0)}")
+    print(f"   Exa Calls: {api_calls.get('exa', 0)}")
     print(f"   Total Calls: {api_calls.get('total', 0)}")
     print(f"   Preference: {insights.get('api_preference', 'N/A')}")
     

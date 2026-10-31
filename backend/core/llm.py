@@ -1,15 +1,47 @@
-"""Shared LLM helpers: one Langfuse-wrapped OpenAI client and prompt loading."""
+"""Shared LLM helpers: Langfuse-wrapped OpenAI-compatible clients and prompt loading.
+
+Two providers share the OpenAI SDK (so Langfuse tracing works for both):
+- OpenAI: chat (streamed tool calls) and embeddings (pgvector dimensions depend on it).
+- Gemini via Google's OpenAI-compatible endpoint: the "bulk" agents (discovery, research,
+  judge, ranking, summarize_rank, events). Used when GEMINI_API_KEY is set, otherwise these
+  agents fall back to OpenAI so nothing breaks without a Gemini key.
+"""
 import os
 from functools import lru_cache
 from pathlib import Path
 
 from langfuse.openai import OpenAI
 
+GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+GEMINI_DEFAULT_MODEL = "gemini-3.5-flash-lite"  # full Flash models think for ~1 min per call on the free tier
+
 
 @lru_cache(maxsize=1)
 def get_openai_client() -> OpenAI:
     """Return the process-wide OpenAI client (traced by Langfuse)."""
     return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+
+@lru_cache(maxsize=1)
+def _get_gemini_client() -> OpenAI:
+    return OpenAI(api_key=os.getenv("GEMINI_API_KEY"), base_url=GEMINI_BASE_URL)
+
+
+def use_gemini() -> bool:
+    return bool(os.getenv("GEMINI_API_KEY"))
+
+
+def get_bulk_client() -> OpenAI:
+    """Client for the bulk (non-chat) agents: Gemini if configured, else OpenAI."""
+    return _get_gemini_client() if use_gemini() else get_openai_client()
+
+
+def bulk_model(openai_env_var: str, openai_default: str) -> str:
+    """Model name for a bulk agent. With Gemini, GEMINI_MODEL applies to all of them;
+    otherwise the agent's own OpenAI env var / default is used."""
+    if use_gemini():
+        return os.getenv("GEMINI_MODEL", GEMINI_DEFAULT_MODEL)
+    return os.getenv(openai_env_var, openai_default)
 
 
 def load_prompt(path: Path, fallback: str) -> str:

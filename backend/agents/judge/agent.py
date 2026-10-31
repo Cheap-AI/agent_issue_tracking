@@ -14,10 +14,10 @@ import json
 import os
 from typing import Any
 
-from backend.core.llm import get_openai_client
+from backend.core.llm import bulk_model, get_bulk_client
 
-client = get_openai_client()
-DEFAULT_MODEL = os.getenv("OPENAI_JUDGE_MODEL", "gpt-4o-mini")
+client = get_bulk_client()
+DEFAULT_MODEL = bulk_model("OPENAI_JUDGE_MODEL", "gpt-4o-mini")
 
 
 _JUDGE_RESPONSE_SCHEMA = """Respond as JSON:

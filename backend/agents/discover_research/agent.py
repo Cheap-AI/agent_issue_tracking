@@ -13,20 +13,20 @@ import logging
 import os
 from typing import Any
 
-from backend.core.llm import get_openai_client
+from backend.core.llm import bulk_model, get_bulk_client
 from langfuse import get_client
 
 from backend.core.issue import get_issue, list_issues
 from backend.services import search_service
-from backend.services import perplexity_service
+from backend.services import exa_service
 from backend.services.vector_search import search_similar_issues_by_text
 
 logger = logging.getLogger(__name__)
 
-client = get_openai_client()
+client = get_bulk_client()
 langfuse = get_client()
 
-DEFAULT_MODEL = os.getenv("OPENAI_DISCOVER_RESEARCH_MODEL", os.getenv("OPENAI_DISCOVERY_MODEL", "gpt-4o"))
+DEFAULT_MODEL = bulk_model("OPENAI_DISCOVER_RESEARCH_MODEL", os.getenv("OPENAI_DISCOVERY_MODEL", "gpt-4o"))
 
 SYSTEM_PROMPT = """You are a discover-and-research agent for an Issue Intelligence Platform.
 
@@ -51,15 +51,15 @@ def _tool_search_tavily(query: str, max_results: int = 10) -> dict[str, Any]:
     return {"query": query, "results": search_service.search(query, max_results=max_results)}
 
 
-# Perplexity tool wrapper, mirrors discovery agent's tool (currently disabled upstream).
-def _tool_search_perplexity(query: str) -> dict[str, Any]:
-    if not perplexity_service.is_configured():
-        return {"query": query, "results": [], "error": "Perplexity API not configured."}
+# Exa tool wrapper, mirrors the discovery agent's tool.
+def _tool_search_exa(query: str) -> dict[str, Any]:
+    if not exa_service.is_configured():
+        return {"query": query, "results": [], "error": "Exa API not configured."}
     try:
-        return {"query": query, "results": perplexity_service.search(query)}
+        return {"query": query, "results": exa_service.search(query)}
     except Exception as e:
-        logger.warning(f"Perplexity search failed for '{query}': {e}")
-        return {"query": query, "results": [], "error": f"Perplexity search failed: {str(e)[:100]}"}
+        logger.warning(f"Exa search failed for '{query}': {e}")
+        return {"query": query, "results": [], "error": f"Exa search failed: {str(e)[:100]}"}
 
 
 def _tool_list_issues() -> dict[str, Any]:
@@ -170,7 +170,7 @@ TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "search_perplexity",
+            "name": "search_exa",
             "description": "Deep research search with citations (higher quality, slower).",
             "parameters": {
                 "type": "object",
@@ -274,8 +274,8 @@ _TERMINAL_TOOLS = {"draft_create_issue", "draft_merge_issue"}
 def _dispatch_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     if name == "search_tavily":
         return _tool_search_tavily(arguments["query"], int(arguments.get("max_results", 10)))
-    if name == "search_perplexity":
-        return _tool_search_perplexity(arguments["query"])
+    if name == "search_exa":
+        return _tool_search_exa(arguments["query"])
     if name == "list_issues":
         return _tool_list_issues()
     if name == "get_issue":

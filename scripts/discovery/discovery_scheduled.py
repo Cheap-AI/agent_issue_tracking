@@ -169,8 +169,8 @@ def main():
         print("❌ ERROR: DATABASE_URL not configured in .env")
         sys.exit(1)
     
-    if not os.getenv("TAVILY_API_KEY") and not os.getenv("PERPLEXITY_API_KEY"):
-        print("⚠️  WARNING: Neither TAVILY_API_KEY nor PERPLEXITY_API_KEY configured")
+    if not os.getenv("TAVILY_API_KEY") and not os.getenv("EXA_API_KEY"):
+        print("⚠️  WARNING: Neither TAVILY_API_KEY nor EXA_API_KEY configured")
         print("   Discovery agent needs at least one search API")
     
     # Select strategy

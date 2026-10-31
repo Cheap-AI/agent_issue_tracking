@@ -9,7 +9,7 @@ This agent:
 import os
 from datetime import datetime
 
-from backend.core.llm import get_openai_client
+from backend.core.llm import bulk_model, get_bulk_client
 
 from backend.core.db import get_session
 from backend.core.knowledge import read_current
@@ -20,7 +20,8 @@ import json
 
 
 # Initialize OpenAI client
-client = get_openai_client()
+client = get_bulk_client()
+DEFAULT_MODEL = bulk_model("OPENAI_RANKING_MODEL", "gpt-4o-mini")
 
 
 SYSTEM_PROMPT = """You are a ranking agent for an AI-native Issue Intelligence Platform.
@@ -153,7 +154,7 @@ Be objective and consistent. Use the full 0-10 range appropriately."""
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",  # Changed to cheaper model that supports JSON mode
+            model=DEFAULT_MODEL,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt}
