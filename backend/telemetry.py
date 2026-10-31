@@ -28,4 +28,6 @@ def setup_langfuse() -> Langfuse:
 def instrument_app(app: FastAPI) -> None:
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
-    FastAPIInstrumentor.instrument_app(app, excluded_urls=EXCLUDED_URLS)
+    # Drop the per-ASGI-message "http send"/"http receive" spans: a streamed chat reply emits one
+    # `send` per chunk, which floods the trace with hundreds of near-empty observations.
+    FastAPIInstrumentor.instrument_app(app, excluded_urls=EXCLUDED_URLS, exclude_spans=["send", "receive"])

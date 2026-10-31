@@ -21,3 +21,5 @@ services:
         sync: false
       - key: LANGFUSE_BASE_URL
         value: https://cloud.langfuse.com
+      - key: LANGFUSE_TRACING_ENVIRONMENT
+        value: production

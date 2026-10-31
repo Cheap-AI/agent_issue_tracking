@@ -6,14 +6,17 @@ accumulated silently and only the final natural-language answer is streamed toke
 """
 from __future__ import annotations
 
+import contextvars
 import json
 import logging
 import os
+import queue
+import threading
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any, Callable, Generator
 
 from backend.core.llm import get_openai_client, load_prompt
-from langfuse import get_client
+from langfuse import get_client, propagate_attributes
 
 from backend.core.chat import append_message, get_or_create_session, list_messages
 from backend.core.global_docs import get_doc
@@ -336,106 +339,142 @@ def _history_to_messages(session_id: str) -> list[dict[str, Any]]:
     return messages
 
 
-def stream_chat_response(session_id: str, user_message: str) -> Generator[dict[str, Any], None, None]:
-    """Yield streaming events for a chat turn: {"type": "token"|"tool_call"|"done", ...}.
+_DONE = object()
 
-    Persists the user message immediately and the final assistant answer once the stream ends.
+
+def _run_turn(session_id: str, user_message: str, emit: Callable[[dict[str, Any]], None]) -> None:
+    """Run one chat turn, emitting streaming events via `emit`.
+
+    Runs inside a single thread so the Langfuse trace context stays valid for the whole turn
+    (an OpenTelemetry context can't be held open across a streaming generator's yields).
     """
     get_or_create_session(session_id)
     append_message(session_id, "user", user_message)
     messages = _history_to_messages(session_id)  # includes the user message just persisted above
 
-    agent_span = langfuse.start_observation(
-        as_type="agent",
-        name="chat_turn",
-        input={"session_id": session_id, "user_message": user_message},
-        metadata={"session_id": session_id},
-    )
     final_text = ""
     executed_tool_calls: list[dict[str, Any]] = []
-    try:
-        for _round in range(MAX_TOOL_ROUNDS):
-            stream = client.chat.completions.create(
-                model=DEFAULT_MODEL,
-                messages=messages,
-                tools=TOOLS,
-                tool_choice="auto",
-                temperature=0.3,
-                stream=True,
-            )
+    with propagate_attributes(session_id=session_id, tags=["chat"]):
+        with langfuse.start_as_current_observation(
+            as_type="agent", name="answer-chat-message", input=user_message
+        ) as agent_span:
+            try:
+                for _round in range(MAX_TOOL_ROUNDS):
+                    # Each model call becomes its own `generation` nested under the agent span.
+                    stream = client.chat.completions.create(
+                        model=DEFAULT_MODEL,
+                        messages=messages,
+                        tools=TOOLS,
+                        tool_choice="auto",
+                        temperature=0.3,
+                        stream=True,
+                        stream_options={"include_usage": True},  # token counts for streamed calls
+                        name="generate-chat-response",
+                    )
 
-            content_buffer = ""
-            tool_call_buffer: dict[int, dict[str, Any]] = {}
-            is_tool_round = False
+                    content_buffer = ""
+                    tool_call_buffer: dict[int, dict[str, Any]] = {}
+                    is_tool_round = False
 
-            for chunk in stream:
-                delta = chunk.choices[0].delta
-                if delta.tool_calls:
-                    is_tool_round = True
-                    for tool_call_delta in delta.tool_calls:
-                        entry = tool_call_buffer.setdefault(
-                            tool_call_delta.index, {"id": "", "name": "", "arguments": ""}
-                        )
-                        if tool_call_delta.id:
-                            entry["id"] = tool_call_delta.id
-                        if tool_call_delta.function and tool_call_delta.function.name:
-                            entry["name"] = tool_call_delta.function.name
-                        if tool_call_delta.function and tool_call_delta.function.arguments:
-                            entry["arguments"] += tool_call_delta.function.arguments
-                elif delta.content:
-                    content_buffer += delta.content
+                    for chunk in stream:
+                        if not chunk.choices:  # final usage-only chunk
+                            continue
+                        delta = chunk.choices[0].delta
+                        if delta.tool_calls:
+                            is_tool_round = True
+                            for tool_call_delta in delta.tool_calls:
+                                entry = tool_call_buffer.setdefault(
+                                    tool_call_delta.index, {"id": "", "name": "", "arguments": ""}
+                                )
+                                if tool_call_delta.id:
+                                    entry["id"] = tool_call_delta.id
+                                if tool_call_delta.function and tool_call_delta.function.name:
+                                    entry["name"] = tool_call_delta.function.name
+                                if tool_call_delta.function and tool_call_delta.function.arguments:
+                                    entry["arguments"] += tool_call_delta.function.arguments
+                        elif delta.content:
+                            content_buffer += delta.content
+                            if not is_tool_round:
+                                emit({"type": "token", "text": delta.content})
+
                     if not is_tool_round:
-                        yield {"type": "token", "text": delta.content}
+                        final_text = content_buffer
+                        break
 
-            if not is_tool_round:
-                final_text = content_buffer
-                break
-
-            messages.append(
-                {
-                    "role": "assistant",
-                    "content": content_buffer,
-                    "tool_calls": [
+                    messages.append(
                         {
-                            "id": entry["id"],
-                            "type": "function",
-                            "function": {"name": entry["name"], "arguments": entry["arguments"]},
+                            "role": "assistant",
+                            "content": content_buffer,
+                            "tool_calls": [
+                                {
+                                    "id": entry["id"],
+                                    "type": "function",
+                                    "function": {"name": entry["name"], "arguments": entry["arguments"]},
+                                }
+                                for entry in tool_call_buffer.values()
+                            ],
                         }
-                        for entry in tool_call_buffer.values()
-                    ],
-                }
-            )
-            for entry in tool_call_buffer.values():
-                tool_arguments = json.loads(entry["arguments"] or "{}")
-                yield {"type": "tool_call", "name": entry["name"]}
-                with agent_span.start_as_current_observation(
-                    as_type="tool", name=entry["name"], input=tool_arguments
-                ) as tool_span:
-                    try:
-                        tool_result = _dispatch_tool(entry["name"], tool_arguments)
-                        tool_span.update(output=tool_result)
-                    except Exception as exc:
-                        tool_span.update(level="ERROR", status_message=str(exc))
-                        tool_result = {"error": str(exc)}
-                executed_tool_calls.append(
-                    {
-                        "id": entry["id"],
-                        "name": entry["name"],
-                        "arguments": tool_arguments,
-                        "error": tool_result.get("error") if isinstance(tool_result, dict) else None,
-                    }
-                )
-                messages.append(
-                    {"role": "tool", "tool_call_id": entry["id"], "content": json.dumps(tool_result)}
-                )
-        else:
-            final_text = final_text or "I wasn't able to finish that within the allowed number of steps."
-    except Exception as exc:
-        agent_span.update(level="ERROR", status_message=str(exc))
-        raise
-    finally:
-        agent_span.update(output={"final_text": final_text})
-        agent_span.end()
+                    )
+                    for entry in tool_call_buffer.values():
+                        tool_arguments = json.loads(entry["arguments"] or "{}")
+                        emit({"type": "tool_call", "name": entry["name"]})
+                        with langfuse.start_as_current_observation(
+                            as_type="tool", name=entry["name"], input=tool_arguments
+                        ) as tool_span:
+                            try:
+                                tool_result = _dispatch_tool(entry["name"], tool_arguments)
+                                tool_span.update(output=tool_result)
+                            except Exception as exc:
+                                tool_span.update(level="ERROR", status_message=str(exc))
+                                tool_result = {"error": str(exc)}
+                        executed_tool_calls.append(
+                            {
+                                "id": entry["id"],
+                                "name": entry["name"],
+                                "arguments": tool_arguments,
+                                "error": tool_result.get("error") if isinstance(tool_result, dict) else None,
+                            }
+                        )
+                        messages.append(
+                            {"role": "tool", "tool_call_id": entry["id"], "content": json.dumps(tool_result)}
+                        )
+                else:
+                    final_text = final_text or "I wasn't able to finish that within the allowed number of steps."
+            except Exception as exc:
+                agent_span.update(level="ERROR", status_message=str(exc))
+                raise
+            finally:
+                agent_span.update(output=final_text)
+                # Legacy trace-level I/O: the root observation is the HTTP request span, which has none.
+                agent_span.set_trace_io(input=user_message, output=final_text)
 
     append_message(session_id, "assistant", final_text, tool_calls=executed_tool_calls or None)
-    yield {"type": "done"}
+    emit({"type": "done"})
+
+
+def stream_chat_response(session_id: str, user_message: str) -> Generator[dict[str, Any], None, None]:
+    """Yield streaming events for a chat turn: {"type": "token"|"tool_call"|"done", ...}.
+
+    Persists the user message immediately and the final assistant answer once the stream ends.
+    The turn runs in a worker thread (with a copy of the caller's context, so it nests under the
+    HTTP request span) and events are handed to this generator through a queue.
+    """
+    events: queue.Queue = queue.Queue()
+    context = contextvars.copy_context()
+
+    def _worker() -> None:
+        try:
+            context.run(_run_turn, session_id, user_message, events.put)
+        except Exception as exc:
+            events.put(exc)
+        finally:
+            events.put(_DONE)
+
+    threading.Thread(target=_worker, daemon=True).start()
+    while True:
+        item = events.get()
+        if item is _DONE:
+            return
+        if isinstance(item, Exception):
+            raise item
+        yield item
