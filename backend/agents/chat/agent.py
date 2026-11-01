@@ -15,7 +15,7 @@ import threading
 from pathlib import Path
 from typing import Any, Callable, Generator
 
-from backend.core.llm import get_openai_client, load_prompt
+from backend.core.llm import get_openai_client, load_prompt, tool_message_content
 from langfuse import get_client, propagate_attributes
 
 from backend.core.chat import append_message, get_or_create_session, list_messages
@@ -280,7 +280,24 @@ def _tool_check_discovery_status(job_id: str) -> dict[str, Any]:
     job = get_job(job_id)
     if job is None:
         return {"status": "unknown", "message": f"No job found with id {job_id}"}
-    return job
+    # A finished job's raw result holds the full discovery trace/report (~28k tokens): only
+    # hand the model a compact summary so each status poll doesn't flood the chat context.
+    result = job.get("result") or {}
+    created = result.get("created_issues") or []
+    summary = {
+        "job_id": job["job_id"],
+        "status": job["status"],
+        "started_at": job["started_at"],
+        "finished_at": job["finished_at"],
+        "error": job["error"],
+    }
+    if result:
+        summary.update(
+            created_issues=[{"id": i.get("id"), "title": i.get("title")} for i in created],
+            report_id=(result.get("report") or {}).get("report_id"),
+            final_message=(result.get("run") or {}).get("final_message", "")[:500],
+        )
+    return summary
 
 
 def _dispatch_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
@@ -436,7 +453,7 @@ def _run_turn(session_id: str, user_message: str, emit: Callable[[dict[str, Any]
                             }
                         )
                         messages.append(
-                            {"role": "tool", "tool_call_id": entry["id"], "content": json.dumps(tool_result)}
+                            {"role": "tool", "tool_call_id": entry["id"], "content": tool_message_content(tool_result, max_field_chars=4000, max_total_chars=16000)}
                         )
                 else:
                     final_text = final_text or "I wasn't able to finish that within the allowed number of steps."
@@ -446,7 +463,11 @@ def _run_turn(session_id: str, user_message: str, emit: Callable[[dict[str, Any]
             finally:
                 agent_span.update(output=final_text)
                 # Legacy trace-level I/O: the root observation is the HTTP request span, which has none.
-                agent_span.set_trace_io(input=user_message, output=final_text)
+                # Telemetry must never break a chat turn, so failures here are swallowed.
+                try:
+                    langfuse.set_current_trace_io(input=user_message, output=final_text)
+                except Exception:
+                    logger.debug("set_current_trace_io failed", exc_info=True)
 
     append_message(session_id, "assistant", final_text, tool_calls=executed_tool_calls or None)
     emit({"type": "done"})

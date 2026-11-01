@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from backend.core.llm import bulk_model, get_bulk_client, load_prompt
+from backend.core.llm import bulk_model, get_bulk_client, load_prompt, tool_message_content
 from langfuse import get_client
 
 from backend.core.issue import create_issue, get_issue, list_issues
@@ -480,6 +480,9 @@ def discover_issues(
                 model=DEFAULT_MODEL,
                 messages=messages,
                 tools=TOOLS,
+                name="discovery-step",
+                trace_id=agent_span.trace_id,
+                parent_observation_id=agent_span.id,
                 tool_choice="auto",
                 temperature=0.2,
                 max_tokens=1200,
@@ -595,7 +598,7 @@ def discover_issues(
                         {
                             "role": "tool",
                             "tool_call_id": tool_call.id,
-                            "content": json.dumps(tool_result),
+                            "content": tool_message_content(tool_result),
                         }
                     )
 

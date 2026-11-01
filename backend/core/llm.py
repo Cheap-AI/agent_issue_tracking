@@ -6,6 +6,7 @@ Two providers share the OpenAI SDK (so Langfuse tracing works for both):
   judge, ranking, summarize_rank, events). Used when GEMINI_API_KEY is set, otherwise these
   agents fall back to OpenAI so nothing breaks without a Gemini key.
 """
+import json
 import os
 from functools import lru_cache
 from pathlib import Path
@@ -49,3 +50,29 @@ def load_prompt(path: Path, fallback: str) -> str:
     if path.exists():
         return path.read_text(encoding="utf-8")
     return fallback
+
+
+_TRUNCATED = "...[truncated]"
+
+
+def _shorten(value, max_field_chars: int):
+    if isinstance(value, str):
+        return value if len(value) <= max_field_chars else value[:max_field_chars] + _TRUNCATED
+    if isinstance(value, list):
+        return [_shorten(v, max_field_chars) for v in value]
+    if isinstance(value, dict):
+        return {k: _shorten(v, max_field_chars) for k, v in value.items()}
+    return value
+
+
+def tool_message_content(result, max_field_chars: int = 700, max_total_chars: int = 12000) -> str:
+    """Serialize a tool result for the model, bounding its size.
+
+    Tool results are re-sent on every later model call, so large search snippets or reports
+    multiply cost. Long string fields are cut to `max_field_chars`, and the whole JSON to
+    `max_total_chars`. Only the model-facing copy is trimmed: spans and stored traces keep the full result.
+    """
+    text = json.dumps(_shorten(result, max_field_chars))
+    if len(text) > max_total_chars:
+        text = text[:max_total_chars] + _TRUNCATED
+    return text

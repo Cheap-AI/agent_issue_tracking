@@ -1,3 +1,4 @@
+import json
 import os
 import unittest
 from unittest.mock import MagicMock, patch
@@ -42,6 +43,21 @@ class BulkModelTests(unittest.TestCase):
             self.assertEqual(llm.bulk_model("OPENAI_JUDGE_MODEL", "gpt-4o-mini"), llm.GEMINI_DEFAULT_MODEL)
         with patch.dict(os.environ, {"GEMINI_API_KEY": "k", "GEMINI_MODEL": "gemini-x"}, clear=True):
             self.assertEqual(llm.bulk_model("OPENAI_JUDGE_MODEL", "gpt-4o-mini"), "gemini-x")
+
+
+class ToolMessageContentTests(unittest.TestCase):
+    def test_long_fields_and_total_are_bounded_and_short_results_untouched(self):
+        small = {"status": "ok", "ids": [1, 2]}
+        self.assertEqual(json.loads(llm.tool_message_content(small)), small)
+
+        big = {"results": [{"url": "u", "content": "x" * 5000} for _ in range(30)]}
+        out = llm.tool_message_content(big, max_field_chars=100, max_total_chars=2000)
+        self.assertLessEqual(len(out), 2000 + len("...[truncated]"))
+        self.assertIn("...[truncated]", out)
+        self.assertNotIn("x" * 101, out)
+
+        field_only = llm.tool_message_content({"c": "y" * 500}, max_field_chars=100)
+        self.assertEqual(json.loads(field_only)["c"], "y" * 100 + "...[truncated]")
 
 
 if __name__ == "__main__":

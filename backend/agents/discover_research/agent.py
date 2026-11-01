@@ -13,7 +13,7 @@ import logging
 import os
 from typing import Any
 
-from backend.core.llm import bulk_model, get_bulk_client
+from backend.core.llm import bulk_model, get_bulk_client, tool_message_content
 from langfuse import get_client
 
 from backend.core.issue import get_issue, list_issues
@@ -363,6 +363,9 @@ def discover_and_research(
                 model=DEFAULT_MODEL,
                 messages=messages,
                 tools=TOOLS,
+                name="discovery-step",
+                trace_id=agent_span.trace_id,
+                parent_observation_id=agent_span.id,
                 tool_choice="auto",
                 temperature=0.2,
                 max_tokens=1200,
@@ -402,7 +405,7 @@ def discover_and_research(
                     candidate = tool_result["candidate"]
                     final_message = f"Drafted candidate via {tool_name}."
 
-                messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": json.dumps(tool_result)})
+                messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": tool_message_content(tool_result)})
 
             if candidate is not None:
                 break
