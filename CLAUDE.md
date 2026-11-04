@@ -81,8 +81,8 @@ Next.js 16 / React 19 / TypeScript / Tailwind CSS app. The `frontend/app/` direc
 
 ### Environment variables
 
-Copy `.env.example` to `.env`. Required keys: `DATABASE_URL`, `OPENAI_API_KEY`, `TAVILY_API_KEY`. Optional: `EXA_API_KEY`, `GEMINI_API_KEY` (bulk agents use Gemini when set; chat and embeddings stay on OpenAI), `LANGFUSE_*` (for observability via self-hosted Langfuse), `OPENAI_DISCOVERY_MODEL`.
+Copy `.env.example` to `.env`. Required keys: `DATABASE_URL`, `OPENAI_API_KEY`, `TAVILY_API_KEY`. Optional: `EXA_API_KEY`, `GEMINI_API_KEY` (bulk agents use Gemini when set; chat and embeddings stay on OpenAI), `LANGFUSE_*` (Langfuse Cloud, US region: https://us.cloud.langfuse.com), `OPENAI_DISCOVERY_MODEL`.
 
 ### Observability
 
-Langfuse is used throughout via `propagate_attributes` / `start_as_current_observation`. All agent and workflow calls are traced. For local use, run Langfuse via Docker (see `DEPLOYMENT.md`).
+Langfuse is used throughout via `propagate_attributes` / `start_as_current_observation`. All agent and workflow calls are traced. Set `LANGFUSE_TRACING_ENVIRONMENT` (development locally, production on Render) to separate traces.

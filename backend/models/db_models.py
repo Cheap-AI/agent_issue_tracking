@@ -8,6 +8,7 @@ Tables:
 - tracked_issues: curated top-N issues leaderboard
 - global_docs: shared rubric/ranking/taxonomy documents (replaces storage/global/*.md)
 """
+import uuid
 from datetime import date, datetime
 
 from sqlalchemy import (
@@ -23,6 +24,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    Uuid,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -293,11 +295,29 @@ class MonthlyReportChunk(Base):
     report: Mapped["MonthlyReport"] = relationship(back_populates="chunks")
 
 
+class Profile(Base):
+    """App-level user record. id matches Supabase auth.users.id; role drives authorization."""
+    __tablename__ = "profiles"
+    __table_args__ = (
+        CheckConstraint("role IN ('admin', 'member')", name="ck_profile_role"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
+    email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    role: Mapped[str] = mapped_column(Text, nullable=False, server_default="member")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
 class ChatSession(Base):
-    """A per-browser chat conversation (id is a client-generated UUID string)."""
+    """A user's chat conversation (id is a client-generated UUID string)."""
     __tablename__ = "chat_sessions"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("profiles.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     title: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

@@ -4,7 +4,7 @@ DATABASE_URL must be set as an environment variable (see backend/.env.example).
 """
 import os
 from contextlib import contextmanager
-from typing import Iterator
+from typing import Generator, Iterator
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
@@ -42,7 +42,7 @@ def get_db() -> Iterator[Session]:
 
 
 @contextmanager
-def get_session() -> Iterator[Session]:
+def get_session() -> Generator[Session, None, None]:
     """Context manager yielding a SQLAlchemy session, committing on success."""
     session = SessionLocal()
     try:

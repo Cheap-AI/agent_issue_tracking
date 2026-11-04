@@ -9,7 +9,7 @@ langfuse_client = setup_langfuse()  # before any get_client() at import time bel
 import logging
 import sys
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Configure logging to stdout so we can see it in the terminal
@@ -20,6 +20,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+from backend.core.auth import CurrentUser, get_current_user
 from backend.routers import agentic, chat, discovery, issues, reports
 
 # FastAPI 앱을 생성합니다.
@@ -62,6 +63,12 @@ def health_check() -> dict[str, object]:
         "service": "python-fastapi",
         "message": "Backend is running",
     }
+
+
+@app.get("/api/me")
+def me(user: CurrentUser = Depends(get_current_user)) -> dict[str, object]:
+    """The signed-in user's profile (creates it on first login)."""
+    return {"id": user.id, "email": user.email, "role": user.role}
 
 
 for _router in (issues.router, discovery.router, reports.router, chat.router, agentic.router):

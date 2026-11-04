@@ -2,29 +2,29 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { authFetch, useSession } from "@/lib/supabase";
 
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
 };
 
-const SESSION_STORAGE_KEY = "chat_session_id";
-
-function getApiBaseUrl() {
-  return process.env.NEXT_PUBLIC_API_BASE_URL || "/api";
-}
-
-function getOrCreateSessionId(): string {
-  let id = localStorage.getItem(SESSION_STORAGE_KEY);
+function getOrCreateSessionId(userId: string): string {
+  // Per-user key so a shared browser doesn't reuse another account's session id.
+  const key = `chat_session_id:${userId}`;
+  let id = localStorage.getItem(key);
   if (!id) {
     id = crypto.randomUUID();
-    localStorage.setItem(SESSION_STORAGE_KEY, id);
+    localStorage.setItem(key, id);
   }
   return id;
 }
 
 export function ChatWidget() {
+  const { session, loading } = useSession();
+  const userId = session?.user.id ?? null;
   const [open, setOpen] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -34,9 +34,14 @@ export function ChatWidget() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const id = getOrCreateSessionId();
+    if (!userId) {
+      setSessionId(null);
+      setMessages([]);
+      return;
+    }
+    const id = getOrCreateSessionId(userId);
     setSessionId(id);
-    fetch(`${getApiBaseUrl()}/chat/sessions/${id}/messages`)
+    authFetch(`/chat/sessions/${id}/messages`)
       .then((response) => (response.ok ? response.json() : { messages: [] }))
       .then((data) => {
         const history: ChatMessage[] = (data.messages || [])
@@ -45,7 +50,7 @@ export function ChatWidget() {
         setMessages(history);
       })
       .catch(() => setMessages([]));
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -61,7 +66,7 @@ export function ChatWidget() {
     setMessages((prev) => [...prev, { role: "user", content: text }, { role: "assistant", content: "" }]);
 
     try {
-      const response = await fetch(`${getApiBaseUrl()}/chat/sessions/${sessionId}/messages`, {
+      const response = await authFetch(`/chat/sessions/${sessionId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text }),
@@ -132,7 +137,12 @@ export function ChatWidget() {
             </div>
 
             <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
-              {messages.length === 0 && (
+              {!loading && !session && (
+                <p className="text-sm text-black/60">
+                  <Link href="/login" className="underline">Sign in</Link> to chat with the assistant.
+                </p>
+              )}
+              {session && messages.length === 0 && (
                 <p className="text-sm text-black/40">Ask me about issues, the leaderboard, or reports.</p>
               )}
               {messages.map((message, index) => (
@@ -166,7 +176,7 @@ export function ChatWidget() {
               />
               <button
                 onClick={sendMessage}
-                disabled={sending || !input.trim()}
+                disabled={sending || !input.trim() || !session}
                 className="rounded-full bg-black px-3 py-2 text-sm text-white disabled:opacity-40"
               >
                 Send

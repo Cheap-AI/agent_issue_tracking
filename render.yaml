@@ -22,6 +22,10 @@ services:
       - key: LANGFUSE_SECRET_KEY
         sync: false
       - key: LANGFUSE_BASE_URL
-        value: https://cloud.langfuse.com
+        value: https://us.cloud.langfuse.com
       - key: LANGFUSE_TRACING_ENVIRONMENT
         value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false

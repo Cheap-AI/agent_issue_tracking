@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Navbar } from "@/components/navbar";
+import { AuthButton } from "@/components/auth-button";
 import { ChatWidget } from "@/components/chat-widget";
 
 export const metadata: Metadata = {
@@ -13,6 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <Navbar />
+        <AuthButton />
         {children}
         <ChatWidget />
       </body>

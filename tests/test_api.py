@@ -4,6 +4,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 import backend.main as main_module
+from backend.core.auth import CurrentUser, get_current_user
 from backend.services import search_service
 from backend.core.issue import create_issue
 
@@ -11,12 +12,21 @@ from backend.core.issue import create_issue
 class ApiTests(unittest.TestCase):
     def setUp(self) -> None:
         create_issue("Seed issue", "A starter issue for testing.")
+        main_module.app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+            id="00000000-0000-0000-0000-000000000001", email="test@example.com", role="admin"
+        )
+        self.addCleanup(main_module.app.dependency_overrides.clear)
         self.client = TestClient(main_module.app)
 
     def test_health_endpoint(self) -> None:
         response = self.client.get("/api/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "ok")
+
+    def test_write_endpoint_requires_auth(self) -> None:
+        main_module.app.dependency_overrides.clear()
+        response = self.client.post("/api/issues", json={"title": "x", "summary": "y"})
+        self.assertEqual(response.status_code, 401)
 
     def test_create_issue_and_list_it(self) -> None:
         response = self.client.post(

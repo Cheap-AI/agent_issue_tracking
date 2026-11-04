@@ -61,6 +61,26 @@ def get_or_create_session(
     return _run_with_session(session, _get_or_create)
 
 
+def claim_session(session_id: str, user_id: str, session: Session | None = None) -> dict[str, Any]:
+    """Create the session owned by user_id, or return it if they already own it.
+
+    Raises PermissionError if the session belongs to someone else (or predates user accounts).
+    """
+    def _claim(db: Session) -> dict[str, Any]:
+        existing = db.get(ChatSession, session_id)
+        if existing is None:
+            row = ChatSession(id=session_id, user_id=user_id)
+            db.add(row)
+            db.flush()
+            db.refresh(row)
+            return _session_to_dict(row)
+        if str(existing.user_id) != str(user_id):
+            raise PermissionError(f"Chat session {session_id!r} is not owned by this user")
+        return _session_to_dict(existing)
+
+    return _run_with_session(session, _claim)
+
+
 def list_messages(session_id: str, session: Session | None = None) -> list[dict[str, Any]]:
     """List messages for a session in chronological order."""
     def _list(db: Session) -> list[dict[str, Any]]:

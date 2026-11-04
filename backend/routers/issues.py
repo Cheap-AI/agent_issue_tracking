@@ -2,6 +2,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
 from sqlalchemy.orm import Session
 
+from backend.core.auth import get_current_user
 from backend.core.db import get_db
 from backend.core.issue import create_issue as create_issue_in_db, delete_issue as delete_issue_db, get_issue, list_events_for_issue, list_issues
 from backend.core.knowledge import update_component
@@ -22,7 +23,7 @@ def get_issues(
     return {"issues": list_issues(session=session, target_year=year, target_month=month)}
 
 
-@router.post("/api/issues", status_code=201)
+@router.post("/api/issues", status_code=201, dependencies=[Depends(get_current_user)])
 def create_issue_endpoint(
     payload: IssueCreateRequest,
     session: Session = Depends(get_db),
@@ -52,7 +53,7 @@ def get_issue_endpoint(issue_id: str, session: Session = Depends(get_db)) -> dic
     return {"issue": issue}
 
 
-@router.delete("/api/issues/{issue_id}")
+@router.delete("/api/issues/{issue_id}", dependencies=[Depends(get_current_user)])
 def delete_issue_endpoint(issue_id: str, session: Session = Depends(get_db)) -> dict[str, object]:
     """Delete an issue by id."""
     deleted = delete_issue_db(issue_id, session=session)
@@ -65,7 +66,7 @@ def delete_issue_endpoint(issue_id: str, session: Session = Depends(get_db)) -> 
     }
 
 
-@router.post("/api/issues/{issue_id}/components/{component}")
+@router.post("/api/issues/{issue_id}/components/{component}", dependencies=[Depends(get_current_user)])
 def update_issue_component(
     issue_id: str,
     component: str,
@@ -111,7 +112,7 @@ def update_issue_component(
     }
 
 
-@router.post("/api/issues/{issue_id}/research")
+@router.post("/api/issues/{issue_id}/research", dependencies=[Depends(get_current_user)])
 def trigger_research_workflow(
     issue_id: str,
     background_tasks: BackgroundTasks,
@@ -162,7 +163,7 @@ def get_issue_events(issue_id: str, session: Session = Depends(get_db)) -> dict[
     return {"issue_id": issue_id, "events": events, "count": len(events)}
 
 
-@router.post("/api/issues/{issue_id}/events")
+@router.post("/api/issues/{issue_id}/events", dependencies=[Depends(get_current_user)])
 def trigger_events_collection(
     issue_id: str,
     background_tasks: BackgroundTasks,

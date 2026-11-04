@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from uuid import uuid4
 
+from backend.core.auth import get_current_user
 from backend.models.schemas import AgentRequest, AgenticPipelineResumeRequest, AgenticPipelineStartRequest
 from backend.services import search_service
 from backend.workflows.langgraph_agentic_pipeline import get_pipeline_state, resume_pipeline, start_pipeline
@@ -9,7 +10,7 @@ from backend.workflows.langgraph_agentic_pipeline import get_pipeline_state, res
 router = APIRouter()
 
 
-@router.post("/api/agentic-pipeline/start")
+@router.post("/api/agentic-pipeline/start", dependencies=[Depends(get_current_user)])
 def start_agentic_pipeline(payload: AgenticPipelineStartRequest) -> dict[str, object]:
     """Start a discover_research -> summarize_rank -> human_review -> persist run.
 
@@ -20,13 +21,13 @@ def start_agentic_pipeline(payload: AgenticPipelineStartRequest) -> dict[str, ob
     return start_pipeline(thread_id, topic=payload.topic.strip(), instruction=payload.instruction.strip())
 
 
-@router.get("/api/agentic-pipeline/{thread_id}")
+@router.get("/api/agentic-pipeline/{thread_id}", dependencies=[Depends(get_current_user)])
 def get_agentic_pipeline_status(thread_id: str) -> dict[str, object]:
     """Get a pipeline run's current status, including the pending human-review payload if any."""
     return get_pipeline_state(thread_id)
 
 
-@router.post("/api/agentic-pipeline/{thread_id}/resume")
+@router.post("/api/agentic-pipeline/{thread_id}/resume", dependencies=[Depends(get_current_user)])
 def resume_agentic_pipeline(thread_id: str, payload: AgenticPipelineResumeRequest) -> dict[str, object]:
     """Resume a paused run with a human decision ('approve' persists the draft, 'reject' discards it)."""
     if payload.decision not in ("approve", "reject"):
@@ -34,7 +35,7 @@ def resume_agentic_pipeline(thread_id: str, payload: AgenticPipelineResumeReques
     return resume_pipeline(thread_id, decision=payload.decision, feedback=payload.feedback)
 
 
-@router.post("/api/agent/research")
+@router.post("/api/agent/research", dependencies=[Depends(get_current_user)])
 def research_topic(payload: AgentRequest) -> dict[str, object]:
     """Search for a topic using Tavily and return a summary of findings (stateless, not persisted)."""
     topic = payload.topic.strip()
