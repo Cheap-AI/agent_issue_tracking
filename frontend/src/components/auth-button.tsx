@@ -8,19 +8,16 @@ export function AuthButton() {
   if (loading) return null;
 
   return (
-    <div className="fixed right-4 top-4 z-50 flex items-center gap-3 text-sm">
+    <div className="account">
       {session ? (
         <>
-          <span className="text-black/50">{session.user.email}</span>
-          <button
-            onClick={() => supabase.auth.signOut()}
-            className="rounded-full border border-black/10 bg-white px-3 py-1 hover:bg-black/5"
-          >
+          <span className="account__email">{session.user.email}</span>
+          <button type="button" onClick={() => supabase.auth.signOut()} className="btn btn--small">
             Sign out
           </button>
         </>
       ) : (
-        <Link href="/login" className="rounded-full bg-black px-3 py-1 text-white">
+        <Link href="/login" className="btn btn--small">
           Sign in
         </Link>
       )}

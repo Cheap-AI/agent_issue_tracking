@@ -1,17 +1,12 @@
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: Console (deal 1/3, seed research-tracker-where-discovers-abf9·8a31eb86·2026-11-05·r0) · redesign: full
+ * nav: top bar, wordmark and two links, sign-in control at the end · signature: the ranked ledger with a lead reading and its four dimension scores, and the issue's dated trail on a spine · states: error, empty, full, loading (detail page), expanded events (ledger rows) · console: graphite
+ * axes: dark/grotesk-sans/chromatic-amber · posture: restrained · contrast: pass · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H4 E4 S4 R4 V4 · weakest: S, a ranked list could belong to any tracker; led with the lead reading and the four dimension scores the backend already returns */
+/* Hallmark · dropped Research, Create New Issue, My Tickets, Documentation, Support menu entries · the old menus were placeholders whose every link pointed at "/" */
+/* Hallmark · dropped onMouseEnter, onMouseLeave, router.push · the hover previews and row buttons became a Details disclosure per row (reachable by keyboard and touch) and plain links to /issues/[id] */
+/* Hallmark · dropped /about · the in-page Home and About nav on the two About stubs duplicated the top bar, which still links /about */
+/* Hallmark · waive 49b · issue titles are real headlines from the data, two lines at 320px · titles are the row content, and truncating them would hide which issue it is */
 @import "tailwindcss";
-
-@theme {
-  --shadow-input: 0px 2px 3px -1px rgba(0, 0, 0, 0.1), 0px 1px 0px 0px rgba(25, 28, 33, 0.02),
-    0px 0px 0px 1px rgba(25, 28, 33, 0.08);
-}
-
-html,
-body {
-  padding: 0;
-  margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-* {
-  box-sizing: border-box;
-}
+@import "./tokens.css";
+@import "./base.css";
+@import "./app.css";

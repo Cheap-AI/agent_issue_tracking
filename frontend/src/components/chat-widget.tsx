@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
 import { authFetch, useSession } from "@/lib/supabase";
 
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
 };
+
+class RateLimitError extends Error {}
 
 function getOrCreateSessionId(userId: string): string {
   // Per-user key so a shared browser doesn't reuse another account's session id.
@@ -71,6 +71,10 @@ export function ChatWidget() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text }),
       });
+      if (response.status === 429) {
+        const wait = response.headers.get("Retry-After");
+        throw new RateLimitError(wait ? `You're sending messages too fast. Try again in ${wait}s.` : "Rate limit reached. Try again later.");
+      }
       if (!response.ok || !response.body) {
         throw new Error("Chat request failed");
       }
@@ -100,16 +104,17 @@ export function ChatWidget() {
               return next;
             });
           } else if (event.type === "tool_call") {
-            setStatus(`using tool: ${event.name}...`);
+            setStatus(`using tool: ${event.name}…`);
           } else if (event.type === "done") {
             setStatus(null);
           }
         }
       }
-    } catch {
+    } catch (err) {
+      const content = err instanceof RateLimitError ? err.message : "Sorry, something went wrong.";
       setMessages((prev) => {
         const next = [...prev];
-        next[next.length - 1] = { role: "assistant", content: "Sorry, something went wrong." };
+        next[next.length - 1] = { role: "assistant", content };
         return next;
       });
     } finally {
@@ -119,78 +124,81 @@ export function ChatWidget() {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ type: "spring", duration: 0.3 }}
-            className="mb-3 flex h-[480px] w-[360px] flex-col rounded-2xl border border-black/10 bg-white shadow-xl"
-          >
-            <div className="flex items-center justify-between rounded-t-2xl border-b border-black/10 px-4 py-3">
-              <span className="text-sm font-semibold">Assistant</span>
-              <button onClick={() => setOpen(false)} className="text-sm text-black/50 hover:text-black">
-                ✕
-              </button>
-            </div>
+    <div className="chat">
+      {open && (
+        <section className="chat__panel" aria-label="Assistant">
+          <div className="chat__head">
+            <span>Assistant</span>
+            <button type="button" className="chat__close" onClick={() => setOpen(false)} aria-label="Close assistant">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
 
-            <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
-              {!loading && !session && (
-                <p className="text-sm text-black/60">
-                  <Link href="/login" className="underline">Sign in</Link> to chat with the assistant.
-                </p>
-              )}
-              {session && messages.length === 0 && (
-                <p className="text-sm text-black/40">Ask me about issues, the leaderboard, or reports.</p>
-              )}
-              {messages.map((message, index) => (
-                <div
-                  key={index}
-                  className={cn(
-                    "max-w-[85%] whitespace-pre-wrap rounded-xl px-3 py-2 text-sm",
-                    message.role === "user"
-                      ? "ml-auto bg-black text-white"
-                      : "bg-black/5 text-black"
-                  )}
-                >
-                  {message.content || (sending && index === messages.length - 1 ? "..." : "")}
-                </div>
-              ))}
-              {status && <p className="text-xs italic text-black/40">{status}</p>}
-            </div>
+          <div ref={scrollRef} className="chat__log" aria-live="polite">
+            {!loading && !session && (
+              <p className="chat__hint">
+                <Link href="/login">Sign in</Link> to chat with the assistant.
+              </p>
+            )}
+            {session && messages.length === 0 && (
+              <p className="chat__hint">Ask me about issues, the leaderboard, or reports.</p>
+            )}
+            {messages.map((message, index) => (
+              <div key={index} className={`msg msg--${message.role}`}>
+                {message.content || (sending && index === messages.length - 1 ? "…" : "")}
+              </div>
+            ))}
+            {status && <p className="chat__status">{status}</p>}
+          </div>
 
-            <div className="flex items-center gap-2 border-t border-black/10 p-3">
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                  }
-                }}
-                placeholder="Ask something..."
-                className="flex-1 rounded-full border border-black/10 px-3 py-2 text-sm outline-none focus:border-black/30"
-              />
-              <button
-                onClick={sendMessage}
-                disabled={sending || !input.trim() || !session}
-                className="rounded-full bg-black px-3 py-2 text-sm text-white disabled:opacity-40"
-              >
-                Send
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          <div className="chat__form">
+            <label htmlFor="chat-input" className="visually-hidden">
+              Message
+            </label>
+            <input
+              id="chat-input"
+              name="message"
+              autoComplete="off"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
+              placeholder="Ask something…"
+              className="input"
+            />
+            <button
+              type="button"
+              onClick={sendMessage}
+              disabled={sending || !input.trim() || !session}
+              className="btn btn--primary"
+            >
+              Send
+            </button>
+          </div>
+        </section>
+      )}
 
       <button
+        type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-14 w-14 items-center justify-center rounded-full bg-black text-white shadow-lg"
+        className="btn chat__toggle"
+        aria-expanded={open}
       >
-        {open ? "✕" : "💬"}
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path
+            d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+          />
+        </svg>
+        {open ? "Close" : "Assistant"}
       </button>
     </div>
   );

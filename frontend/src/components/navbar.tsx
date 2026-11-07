@@ -1,68 +1,37 @@
 "use client";
 
-import React, { useState } from "react";
 import Link from "next/link";
-import { Menu, MenuItem, HoveredLink, ProductItem } from "./ui/navbar-menu";
-import { cn } from "../lib/utils";
+import { usePathname } from "next/navigation";
+import { AuthButton } from "./auth-button";
 
-export function Navbar({ className }: { className?: string }) {
-  const [active, setActive] = useState<string | null>(null);
+const LINKS = [
+  { href: "/", label: "Issues" },
+  { href: "/about", label: "About" },
+];
+
+export function Navbar() {
+  const pathname = usePathname();
 
   return (
-    <div
-      className={cn("fixed inset-x-0 top-0 z-50 mx-auto w-full", className)}
-    >
-      <Menu setActive={setActive}>
-        <MenuItem setActive={setActive} active={active} item="Home">
-          <div className="flex flex-col space-y-4 text-sm">
-            <HoveredLink href="/">
-              Dashboard
-            </HoveredLink>
-          </div>
-        </MenuItem>
-
-        <MenuItem setActive={setActive} active={active} item="Issues">
-          <div className="flex flex-col space-y-4 text-sm">
-            <HoveredLink href="/">
-              View All Issues
-            </HoveredLink>
-            <HoveredLink href="/">
-              Create New Issue
-            </HoveredLink>
-            <HoveredLink href="/">
-              My Tickets
-            </HoveredLink>
-          </div>
-        </MenuItem>
-
-        <MenuItem setActive={setActive} active={active} item="Research">
-          <div className="flex flex-col space-y-4 text-sm">
-            <HoveredLink href="/">
-              Generate Draft
-            </HoveredLink>
-            <HoveredLink href="/">
-              Browse Topics
-            </HoveredLink>
-            <HoveredLink href="/">
-              Research History
-            </HoveredLink>
-          </div>
-        </MenuItem>
-
-        <MenuItem setActive={setActive} active={active} item="About">
-          <div className="flex flex-col space-y-4 text-sm">
-            <HoveredLink href="/about">
-              About Platform
-            </HoveredLink>
-            <HoveredLink href="/">
-              Documentation
-            </HoveredLink>
-            <HoveredLink href="/">
-              Support
-            </HoveredLink>
-          </div>
-        </MenuItem>
-      </Menu>
-    </div>
+    <header className="topbar">
+      <div className="container topbar__inner">
+        <Link href="/" className="wordmark" aria-label="Issue Tracker home">
+          Issue Tracker
+        </Link>
+        <nav className="topbar__links" aria-label="Primary">
+          {LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="navlink"
+              aria-current={pathname === link.href ? "page" : undefined}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+        <AuthButton />
+      </div>
+    </header>
   );
 }

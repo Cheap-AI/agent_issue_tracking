@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 
 type Issue = {
@@ -28,6 +27,14 @@ const getApiBaseUrl = () => {
   // In production, use the full backend URL (e.g., https://backend.com/api)
   // In development, use /api which is proxied to localhost:8000
   return process.env.NEXT_PUBLIC_API_BASE_URL || "/api";
+};
+
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
 };
 
 export default function IssueDetailPage() {
@@ -77,77 +84,108 @@ export default function IssueDetailPage() {
   }, [apiBaseUrl, issueId]);
 
   return (
-    <main style={{ minHeight: "100vh", padding: "1.25rem", paddingTop: "5rem", fontFamily: "Inter, sans-serif", background: "linear-gradient(135deg, #f7f8ff 0%, #fdfcf8 100%)", color: "#14213d" }}>
-      <div style={{ maxWidth: "820px", margin: "0 auto", display: "grid", gap: "1.25rem" }}>
-        <Link href="/" style={{ textDecoration: "none", color: "#6b7280", fontSize: "0.9rem" }}>
-          ← Back to issues
-        </Link>
+    <main className="container page">
+      <Link href="/" className="backlink">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+          <path d="M8 2L4 6l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        Back to issues
+      </Link>
 
-        {error ? <div style={{ color: "crimson" }}>{error}</div> : null}
+      {error ? (
+        <p className="notice notice--bad" role="alert">
+          {error}
+        </p>
+      ) : null}
 
-        {loading ? (
-          <div style={{ color: "#6b7280" }}>Loading...</div>
-        ) : issue ? (
-          <>
-            <motion.header
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35 }}
-              style={{ borderRadius: 28, padding: "1.4rem", background: "rgba(255,255,255,0.82)", border: "1px solid rgba(20,33,61,0.08)", boxShadow: "0 18px 45px rgba(20,33,61,0.08)" }}
-            >
-              <h1 style={{ margin: "0 0 0.6rem", fontSize: "1.6rem" }}>{issue.title}</h1>
-              <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "0.9rem" }}>
-                {(issue.tags || []).map((tag) => (
-                  <span key={tag} style={{ background: "rgba(20,33,61,0.05)", padding: "0.3rem 0.6rem", borderRadius: "999px", fontSize: "0.78rem" }}>
-                    {tag}
-                  </span>
-                ))}
-              </div>
-              <div style={{ color: "#374151", lineHeight: 1.6, marginBottom: issue.why ? "0.9rem" : 0 }}>{issue.summary}</div>
-              {issue.why ? (
-                <div style={{ color: "#5b6473", lineHeight: 1.6, fontSize: "0.92rem", borderTop: "1px solid rgba(20,33,61,0.08)", paddingTop: "0.8rem" }}>
-                  <strong>Why it matters: </strong>
-                  {issue.why}
-                </div>
+      {loading ? (
+        <div className="detail" aria-busy="true">
+          <div className="detail__main">
+            <span className="skeleton" style={{ height: "2.4rem", width: "70%" }} />
+            <span className="skeleton" style={{ height: "5rem" }} />
+            <span className="skeleton" style={{ height: "12rem" }} />
+          </div>
+          <span className="skeleton" style={{ height: "7rem" }} />
+          <span className="visually-hidden">Loading…</span>
+        </div>
+      ) : issue ? (
+        <div className="detail">
+          <div className="detail__main">
+            <header className="page-head">
+              <h1 className="detail__title">{issue.title}</h1>
+              {(issue.tags || []).length > 0 ? (
+                <ul className="ledger__tags" aria-label="Tags">
+                  {(issue.tags || []).map((tag) => (
+                    <li key={tag} className="tag">
+                      {tag}
+                    </li>
+                  ))}
+                </ul>
               ) : null}
-            </motion.header>
+            </header>
 
-            <motion.section
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: 0.05 }}
-              style={{ borderRadius: 28, padding: "1.4rem", background: "rgba(255,255,255,0.82)", border: "1px solid rgba(20,33,61,0.08)", boxShadow: "0 18px 45px rgba(20,33,61,0.08)" }}
-            >
-              <div style={{ fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 700, color: "#6b7280", marginBottom: "0.9rem" }}>
-                Timeline ({events.length} events)
+            <p className="detail__summary">{issue.summary}</p>
+
+            {issue.why ? (
+              <section className="why">
+                <h2>Why it matters</h2>
+                <p>{issue.why}</p>
+              </section>
+            ) : null}
+
+            <section aria-labelledby="timeline-heading">
+              <div className="trail-head">
+                <h2 id="timeline-heading">Timeline</h2>
+                <span className="measured muted">{events.length} events</span>
               </div>
 
               {events.length === 0 ? (
-                <div style={{ color: "#6b7280" }}>No events collected for this issue yet.</div>
+                <p className="panel__empty" style={{ paddingInline: 0 }}>
+                  No events collected for this issue yet.
+                </p>
               ) : (
-                <div style={{ display: "grid", gap: "1rem" }}>
+                <ol className="trail" style={{ marginTop: "var(--space-lg)" }}>
                   {events.map((event) => (
-                    <div key={event.id} style={{ borderLeft: "2px solid rgba(59,130,246,0.35)", paddingLeft: "1rem" }}>
-                      <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "#3b82f6" }}>{event.event_date || "Date unknown"}</div>
-                      <div style={{ fontSize: "1rem", fontWeight: 700, margin: "0.2rem 0" }}>{event.title}</div>
-                      <div style={{ color: "#374151", lineHeight: 1.55, marginBottom: "0.4rem" }}>{event.description}</div>
+                    <li key={event.id} className="trail__entry">
+                      <span className="trail__date measured">{event.event_date || "Date unknown"}</span>
+                      <h3 className="trail__title">{event.title}</h3>
+                      <p className="trail__body">{event.description}</p>
                       {event.source_urls.length > 0 ? (
-                        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                        <div className="trail__sources">
                           {event.source_urls.map((url) => (
-                            <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ fontSize: "0.8rem", color: "#8b5cf6" }}>
+                            <a
+                              key={url}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label={`Source: ${hostOf(url)}`}
+                            >
                               Source
                             </a>
                           ))}
                         </div>
                       ) : null}
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ol>
               )}
-            </motion.section>
-          </>
-        ) : null}
-      </div>
+            </section>
+          </div>
+
+          <aside className="panel" aria-label="Record">
+            <dl className="record">
+              <div>
+                <dt>Issue</dt>
+                <dd className="measured">{issue.id}</dd>
+              </div>
+              <div>
+                <dt>Events</dt>
+                <dd className="measured">{events.length}</dd>
+              </div>
+            </dl>
+          </aside>
+        </div>
+      ) : null}
     </main>
   );
 }

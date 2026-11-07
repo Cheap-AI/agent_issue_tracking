@@ -4,6 +4,7 @@ import logging
 
 from backend.agents.ranking.agent import get_leaderboard
 from backend.core.auth import get_current_user
+from backend.core.rate_limit import rate_limit
 from backend.models.schemas import DiscoveryRequest
 from backend.workflows.discover_issue import discover_issue as discover_issue_workflow
 from backend.workflows.discovery_reports import get_discovery_insights, load_recent_reports
@@ -64,7 +65,7 @@ def _run_discovery_with_logging(
         raise
 
 
-@router.post("/api/discovery", dependencies=[Depends(get_current_user)])
+@router.post("/api/discovery", dependencies=[Depends(rate_limit("discovery", 5, 3600))])
 def trigger_discovery_workflow(
     payload: DiscoveryRequest,
     background_tasks: BackgroundTasks,

@@ -1,8 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useId, useMemo, useState } from "react";
 
 type Issue = {
   id: string;
@@ -38,28 +37,32 @@ const getApiBaseUrl = () => {
   return process.env.NEXT_PUBLIC_API_BASE_URL || "/api";
 };
 
-const cardTones = [
-  { bg: "linear-gradient(135deg, #eefcf7 0%, #dff8ee 100%)", accent: "#37b38b", text: "#134e3a" },
-  { bg: "linear-gradient(135deg, #f5ecff 0%, #ece4ff 100%)", accent: "#8b5cf6", text: "#4c1d95" },
-  { bg: "linear-gradient(135deg, #fff8e8 0%, #ffe9c2 100%)", accent: "#f59e0b", text: "#92400e" },
-  { bg: "linear-gradient(135deg, #eef7ff 0%, #dceeff 100%)", accent: "#3b82f6", text: "#1d4ed8" },
-];
+const formatScore = (score: number) => score.toFixed(1);
 
-type IssueCardProps = {
+function Chevron() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+      <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+type IssueRowProps = {
   issue: Issue;
-  tone: (typeof cardTones)[number];
+  ranked?: LeaderboardEntry;
   apiBaseUrl: string;
 };
 
-function IssueCard({ issue, tone, apiBaseUrl }: IssueCardProps) {
-  const router = useRouter();
-  const [hovered, setHovered] = useState(false);
+function IssueRow({ issue, ranked, apiBaseUrl }: IssueRowProps) {
+  const [open, setOpen] = useState(false);
   const [events, setEvents] = useState<EventItem[] | null>(null);
   const [loadingEvents, setLoadingEvents] = useState(false);
+  const detailsId = useId();
 
-  const handleMouseEnter = () => {
-    setHovered(true);
-    if (events !== null || loadingEvents) {
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    if (!next || events !== null || loadingEvents) {
       return;
     }
     setLoadingEvents(true);
@@ -71,137 +74,125 @@ function IssueCard({ issue, tone, apiBaseUrl }: IssueCardProps) {
   };
 
   const recentEvents = (events || []).slice(-4).reverse();
+  const tags = (issue.tags || []).slice(0, 4);
 
   return (
-    <div style={{ position: "relative" }}>
-      <motion.button
-        whileHover={{ y: -4, scale: 1.01 }}
-        whileTap={{ scale: 0.98 }}
-        transition={{ type: "spring", stiffness: 260, damping: 20 }}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={() => setHovered(false)}
-        onClick={() => router.push(`/issues/${issue.id}`)}
-        style={{
-          border: "1px solid rgba(15, 23, 42, 0.08)",
-          borderRadius: 24,
-          padding: "1rem",
-          width: "100%",
-          textAlign: "left",
-          background: tone.bg,
-          color: tone.text,
-          cursor: "pointer",
-          boxShadow: "0 12px 30px rgba(15, 23, 42, 0.08)",
-          display: "grid",
-          gap: "0.6rem",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", opacity: 0.75 }}>
-            Issue
-          </span>
-          <span style={{ width: 10, height: 10, borderRadius: "999px", background: tone.accent }} />
-        </div>
-        <div style={{ fontSize: "1.02rem", fontWeight: 700, lineHeight: 1.35 }}>{issue.title}</div>
-        <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
-          {(issue.tags || []).slice(0, 4).map((tag) => (
-            <span key={tag} style={{ background: "rgba(255,255,255,0.7)", padding: "0.3rem 0.55rem", borderRadius: "999px", fontSize: "0.72rem" }}>
-              {tag}
-            </span>
-          ))}
-        </div>
-      </motion.button>
-
-      <AnimatePresence>
-        {hovered ? (
-          <motion.div
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.15 }}
-            style={{
-              position: "absolute",
-              top: "calc(100% + 0.5rem)",
-              left: 0,
-              right: 0,
-              zIndex: 20,
-              borderRadius: 18,
-              padding: "0.9rem 1rem",
-              background: "white",
-              border: "1px solid rgba(20,33,61,0.1)",
-              boxShadow: "0 18px 40px rgba(20,33,61,0.18)",
-              pointerEvents: "none",
-            }}
+    <tbody>
+      <tr className={open ? "ledger__row--open" : undefined}>
+        <td className="ledger__rank measured">
+          {ranked ? `#${ranked.rank}` : <span className="visually-hidden">Unranked</span>}
+        </td>
+        <td>
+          <Link href={`/issues/${issue.id}`} className="ledger__title">
+            {issue.title}
+          </Link>
+          {tags.length > 0 ? (
+            <ul className="ledger__tags" aria-label="Tags">
+              {tags.map((tag) => (
+                <li key={tag} className="tag">
+                  {tag}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <button
+            type="button"
+            className="disclose"
+            aria-expanded={open}
+            aria-controls={detailsId}
+            onClick={toggle}
           >
-            <div style={{ fontSize: "0.85rem", color: "#374151", lineHeight: 1.5, marginBottom: "0.6rem" }}>
-              {issue.summary}
+            <Chevron />
+            {open ? "Hide details" : "Details"}
+          </button>
+        </td>
+        <td className="ledger__score measured">{ranked ? formatScore(ranked.overall_score) : null}</td>
+      </tr>
+      {open ? (
+        <tr className="ledger__row--open">
+          <td />
+          <td colSpan={2}>
+            <div id={detailsId} className="details">
+              <p>{issue.summary}</p>
+              <div className="details__label">Recent events</div>
+              {loadingEvents ? (
+                <p className="muted">Loading…</p>
+              ) : recentEvents.length === 0 ? (
+                <p className="muted">No events collected yet.</p>
+              ) : (
+                <ul className="details__events">
+                  {recentEvents.map((event) => (
+                    <li key={event.id}>
+                      <span className="event-date measured">{event.event_date || "Undated"}</span>
+                      <span>{event.title}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-            <div style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#6b7280", marginBottom: "0.35rem" }}>
-              Recent events
-            </div>
-            {loadingEvents ? (
-              <div style={{ fontSize: "0.82rem", color: "#9ca3af" }}>Loading...</div>
-            ) : recentEvents.length === 0 ? (
-              <div style={{ fontSize: "0.82rem", color: "#9ca3af" }}>No events collected yet.</div>
-            ) : (
-              <div style={{ display: "grid", gap: "0.35rem" }}>
-                {recentEvents.map((event) => (
-                  <div key={event.id} style={{ fontSize: "0.82rem", color: "#374151" }}>
-                    <strong>{event.event_date || "Undated"}</strong> — {event.title}
-                  </div>
-                ))}
-              </div>
-            )}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-    </div>
+          </td>
+        </tr>
+      ) : null}
+    </tbody>
   );
 }
 
 function LeaderboardPanel({ entries }: { entries: LeaderboardEntry[] }) {
-  const router = useRouter();
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const shown = entries.slice(0, 20);
+  const [lead, ...rest] = shown;
+  const dimensions = lead?.dimension_scores ? Object.entries(lead.dimension_scores) : [];
 
   return (
-    <div style={{ borderRadius: 28, padding: "1.2rem", background: "rgba(255,255,255,0.82)", border: "1px solid rgba(20,33,61,0.08)", boxShadow: "0 18px 45px rgba(20,33,61,0.08)" }}>
-      <div style={{ fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 700, color: "#6b7280", marginBottom: "0.9rem" }}>
-        Leaderboard
+    <section className="panel" aria-labelledby="leaderboard-heading">
+      <div className="panel__head">
+        <h2 id="leaderboard-heading">Leaderboard</h2>
       </div>
-      {entries.length === 0 ? (
-        <div style={{ color: "#6b7280", fontSize: "0.9rem" }}>No ranked issues yet.</div>
+      {!lead ? (
+        <p className="panel__empty">No ranked issues yet.</p>
       ) : (
-        <div style={{ display: "grid", gap: "0.6rem" }}>
-          {entries.slice(0, 20).map((entry) => (
-            <button
-              key={entry.issue_id}
-              onClick={() => router.push(`/issues/${entry.issue_id}`)}
-              onMouseEnter={() => setHoveredId(entry.issue_id)}
-              onMouseLeave={() => setHoveredId(null)}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "0.6rem",
-                padding: "0.55rem 0.7rem",
-                borderRadius: 14,
-                background: hoveredId === entry.issue_id ? "rgba(20,33,61,0.06)" : "rgba(20,33,61,0.03)",
-                border: "none",
-                cursor: "pointer",
-                width: "100%",
-                transition: "background 0.15s",
-                textAlign: "left",
-              }}
-            >
-              <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", minWidth: 0, flex: 1, overflow: "hidden" }}>
-                <span style={{ fontWeight: 700, color: "#6b7280", fontSize: "0.85rem", flexShrink: 0 }}>#{entry.rank}</span>
-                <span style={{ fontSize: "0.85rem", color: "#14213d", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{entry.title}</span>
+        <>
+          <div className="leader">
+            <h3 className="leader__title">
+              <Link href={`/issues/${lead.issue_id}`}>{lead.title}</Link>
+            </h3>
+            <div className="leader__score">
+              <div className="reading" aria-label={`Overall score ${formatScore(lead.overall_score)}`}>
+                {formatScore(lead.overall_score)}
               </div>
-              <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "#3b82f6", flexShrink: 0 }}>{entry.overall_score}</span>
-            </button>
-          ))}
-        </div>
+              <span className="leader__rank measured">Rank #{lead.rank}</span>
+            </div>
+            {dimensions.length > 0 ? (
+              <dl className="dims">
+                {dimensions.map(([name, value]) => (
+                  <div key={name}>
+                    <dt>{name.charAt(0).toUpperCase() + name.slice(1)}</dt>
+                    <dd aria-hidden="true">
+                      <span className="bar">
+                        <span style={{ width: `${Math.max(0, Math.min(100, value * 10))}%` }} />
+                      </span>
+                    </dd>
+                    <dd className="measured">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
+          </div>
+          {rest.length > 0 ? (
+            <ol className="rank-list" start={rest[0].rank}>
+              {rest.map((entry) => (
+                <li key={entry.issue_id}>
+                  <Link href={`/issues/${entry.issue_id}`}>
+                    <span className="rank-list__rank measured">#{entry.rank}</span>
+                    <span className="rank-list__title">{entry.title}</span>
+                    <span className="measured">{formatScore(entry.overall_score)}</span>
+                  </Link>
+                </li>
+              ))}
+            </ol>
+          ) : null}
+        </>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -211,6 +202,7 @@ export default function Home() {
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const searchId = useId();
 
   const apiBaseUrl = useMemo(() => getApiBaseUrl(), []);
 
@@ -241,6 +233,12 @@ export default function Home() {
     });
     return Array.from(tagSet).sort();
   }, [issues]);
+
+  const rankByIssue = useMemo(() => {
+    const map = new Map<string, LeaderboardEntry>();
+    leaderboard.forEach((entry) => map.set(entry.issue_id, entry));
+    return map;
+  }, [leaderboard]);
 
   useEffect(() => {
     const loadIssues = async () => {
@@ -274,111 +272,92 @@ export default function Home() {
   }, [apiBaseUrl]);
 
   return (
-    <main style={{ minHeight: "100vh", padding: "1.25rem", paddingTop: "5rem", fontFamily: "Inter, sans-serif", background: "linear-gradient(135deg, #f7f8ff 0%, #fdfcf8 100%)", color: "#14213d" }}>
-      <style>{`
-        @media (max-width: 768px) {
-          .responsive-grid {
-            grid-template-columns: 1fr !important;
-          }
-          .responsive-grid > div:last-child {
-            order: -1;
-          }
-          main {
-            padding: 1rem !important;
-            padding-top: 4rem !important;
-          }
-        }
-      `}</style>
-      <div style={{ maxWidth: "1200px", margin: "0 auto", display: "grid", gap: "1.25rem" }}>
-        <motion.header
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35 }}
-          style={{ borderRadius: 28, padding: "1.25rem 1.4rem", background: "rgba(255,255,255,0.82)", border: "1px solid rgba(20,33,61,0.08)", boxShadow: "0 18px 45px rgba(20,33,61,0.08)" }}
-        >
-          <div style={{ fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 700, color: "#6b7280" }}>Issue Tracker</div>
-          <h1 style={{ margin: "0.25rem 0", fontSize: "1.7rem" }}>Discovered issues, ranked and tracked over time.</h1>
-        </motion.header>
+    <main className="container page">
+      <header className="page-head">
+        <h1>Discovered issues, ranked and tracked over time.</h1>
+      </header>
 
-        {error ? <div style={{ color: "crimson" }}>{error}</div> : null}
+      {error ? (
+        <p className="notice notice--bad" role="alert">
+          {error}
+        </p>
+      ) : null}
 
-        <section className="responsive-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, 2.2fr) minmax(260px, 1fr)", gap: "1.25rem", alignItems: "start" }}>
-          <div style={{ borderRadius: 28, padding: "1.2rem", background: "rgba(255,255,255,0.82)", border: "1px solid rgba(20,33,61,0.08)", boxShadow: "0 18px 45px rgba(20,33,61,0.08)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.95rem" }}>
-              <div style={{ fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 700, color: "#6b7280" }}>Issues</div>
-              <div style={{ color: "#6b7280", fontSize: "0.95rem" }}>{filteredIssues.length} of {issues.length}</div>
-            </div>
+      <div className="workspace">
+        <section className="panel" aria-labelledby="issues-heading">
+          <div className="panel__head">
+            <h2 id="issues-heading">Issues</h2>
+            <span className="measured muted">
+              {filteredIssues.length} of {issues.length}
+            </span>
+          </div>
 
+          <div className="toolbar">
+            <label htmlFor={searchId} className="visually-hidden">
+              Search issues
+            </label>
             <input
-              type="text"
-              placeholder="Search issues..."
+              id={searchId}
+              name="search"
+              type="search"
+              autoComplete="off"
+              className="input"
+              placeholder="Search issues…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "0.7rem 1rem",
-                borderRadius: 16,
-                border: "1px solid rgba(20,33,61,0.12)",
-                fontSize: "0.9rem",
-                marginBottom: "0.9rem",
-                background: "rgba(255,255,255,0.8)",
-                outline: "none",
-              }}
             />
 
             {allTags.length > 0 && (
-              <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "0.9rem" }}>
+              <div className="chips" role="group" aria-label="Filter by tag">
                 <button
+                  type="button"
+                  className="chip"
+                  aria-pressed={selectedTag === null}
                   onClick={() => setSelectedTag(null)}
-                  style={{
-                    padding: "0.35rem 0.7rem",
-                    borderRadius: "999px",
-                    fontSize: "0.75rem",
-                    border: selectedTag === null ? "1px solid #3b82f6" : "1px solid rgba(20,33,61,0.12)",
-                    background: selectedTag === null ? "#3b82f6" : "rgba(255,255,255,0.9)",
-                    color: selectedTag === null ? "white" : "#6b7280",
-                    cursor: "pointer",
-                    fontWeight: selectedTag === null ? 700 : 500,
-                  }}
                 >
                   All
                 </button>
                 {allTags.map((tag) => (
                   <button
                     key={tag}
+                    type="button"
+                    className="chip"
+                    aria-pressed={tag === selectedTag}
                     onClick={() => setSelectedTag(tag === selectedTag ? null : tag)}
-                    style={{
-                      padding: "0.35rem 0.7rem",
-                      borderRadius: "999px",
-                      fontSize: "0.75rem",
-                      border: tag === selectedTag ? "1px solid #3b82f6" : "1px solid rgba(20,33,61,0.12)",
-                      background: tag === selectedTag ? "#3b82f6" : "rgba(255,255,255,0.9)",
-                      color: tag === selectedTag ? "white" : "#6b7280",
-                      cursor: "pointer",
-                      fontWeight: tag === selectedTag ? 700 : 500,
-                    }}
                   >
                     {tag}
                   </button>
                 ))}
               </div>
             )}
-
-            {filteredIssues.length === 0 ? (
-              <div style={{ color: "#6b7280" }}>
-                {issues.length === 0 ? "No issues yet." : "No issues match your filters."}
-              </div>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem" }}>
-                {filteredIssues.slice(0, 20).map((issue, index) => (
-                  <IssueCard key={issue.id} issue={issue} tone={cardTones[index % cardTones.length]} apiBaseUrl={apiBaseUrl} />
-                ))}
-              </div>
-            )}
           </div>
 
-          <LeaderboardPanel entries={leaderboard} />
+          {filteredIssues.length === 0 ? (
+            <p className="panel__empty">
+              {issues.length === 0 ? "No issues yet." : "No issues match your filters."}
+            </p>
+          ) : (
+            <table className="ledger">
+              <thead>
+                <tr>
+                  <th scope="col" className="ledger__rank">Rank</th>
+                  <th scope="col">Issue</th>
+                  <th scope="col" className="ledger__score">Score</th>
+                </tr>
+              </thead>
+              {filteredIssues.slice(0, 20).map((issue) => (
+                <IssueRow
+                  key={issue.id}
+                  issue={issue}
+                  ranked={rankByIssue.get(issue.id)}
+                  apiBaseUrl={apiBaseUrl}
+                />
+              ))}
+            </table>
+          )}
         </section>
+
+        <LeaderboardPanel entries={leaderboard} />
       </div>
     </main>
   );

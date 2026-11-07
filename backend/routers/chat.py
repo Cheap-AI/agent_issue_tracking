@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse
 
 from backend.agents.chat.agent import stream_chat_response
 from backend.core.auth import CurrentUser, get_current_user
+from backend.core.rate_limit import rate_limit
 from backend.core.chat import claim_session, list_messages as list_chat_messages
 from backend.models.schemas import ChatMessageRequest
 
@@ -32,7 +33,10 @@ def get_chat_messages(session_id: str, user: CurrentUser = Depends(get_current_u
     return {"messages": list_chat_messages(session_id)}
 
 
-@router.post("/api/chat/sessions/{session_id}/messages")
+@router.post(
+    "/api/chat/sessions/{session_id}/messages",
+    dependencies=[Depends(rate_limit("chat_burst", 10, 60)), Depends(rate_limit("chat_daily", 200, 86400))],
+)
 def post_chat_message(
     session_id: str, payload: ChatMessageRequest, user: CurrentUser = Depends(get_current_user)
 ) -> StreamingResponse:
