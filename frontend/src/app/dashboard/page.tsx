@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useId, useMemo, useState } from "react";
+import { EMPTY_SELECTION, TagFilter, matchesTags, type TagSelection } from "../../components/tag-filter";
 
 type Issue = {
   id: string;
@@ -9,6 +10,9 @@ type Issue = {
   summary: string;
   why?: string;
   tags?: string[];
+  geography?: string[];
+  topics?: string[];
+  affected_groups?: string[];
   is_active?: boolean;
   created_at?: string;
 };
@@ -201,7 +205,7 @@ export default function Home() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [tagSelection, setTagSelection] = useState<TagSelection>(EMPTY_SELECTION);
   const searchId = useId();
 
   const apiBaseUrl = useMemo(() => getApiBaseUrl(), []);
@@ -217,22 +221,10 @@ export default function Home() {
       );
     }
 
-    if (selectedTag) {
-      filtered = filtered.filter((issue) =>
-        issue.tags?.includes(selectedTag)
-      );
-    }
+    filtered = filtered.filter((issue) => matchesTags(issue, tagSelection));
 
     return filtered;
-  }, [issues, searchQuery, selectedTag]);
-
-  const allTags = useMemo(() => {
-    const tagSet = new Set<string>();
-    issues.forEach((issue) => {
-      issue.tags?.forEach((tag) => tagSet.add(tag));
-    });
-    return Array.from(tagSet).sort();
-  }, [issues]);
+  }, [issues, searchQuery, tagSelection]);
 
   const rankByIssue = useMemo(() => {
     const map = new Map<string, LeaderboardEntry>();
@@ -307,28 +299,8 @@ export default function Home() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
 
-            {allTags.length > 0 && (
-              <div className="chips" role="group" aria-label="Filter by tag">
-                <button
-                  type="button"
-                  className="chip"
-                  aria-pressed={selectedTag === null}
-                  onClick={() => setSelectedTag(null)}
-                >
-                  All
-                </button>
-                {allTags.map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    className="chip"
-                    aria-pressed={tag === selectedTag}
-                    onClick={() => setSelectedTag(tag === selectedTag ? null : tag)}
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
+            {issues.length > 0 && (
+              <TagFilter issues={issues} selection={tagSelection} onChange={setTagSelection} />
             )}
           </div>
 

@@ -49,6 +49,19 @@
 .workspace { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(280px, 1fr); gap: var(--gap-columns); align-items: start; }
 .toolbar { display: grid; gap: var(--space-sm); padding: var(--space-md); border-bottom: var(--rule-hair) solid var(--color-rule); }
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+.tagfilter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); }
+.tagfilter__item { position: relative; }
+.tagfilter__button { display: inline-flex; align-items: center; gap: var(--space-xs); min-height: 40px; padding-inline: var(--space-sm); border: var(--rule-hair) solid var(--color-muted); border-radius: var(--radius-pill); background: var(--color-paper-3); color: var(--color-ink); font-size: var(--text-sm); cursor: pointer; transition: border-color var(--dur-micro) var(--ease-out); }
+.tagfilter__button:hover:not(:disabled) { border-color: var(--color-ink-2); }
+.tagfilter__button:disabled { color: var(--color-muted); cursor: default; }
+.tagfilter__button[aria-expanded="true"] { border-color: var(--color-cool); }
+.tagfilter__count { min-width: 1.4em; padding-inline: 5px; border-radius: 4px; background: var(--color-cool-soft); color: var(--color-ink); font-size: var(--text-xs); text-align: center; }
+.tagfilter__caret { width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); transition: transform var(--dur-micro) var(--ease-out); }
+.tagfilter__button[aria-expanded="true"] .tagfilter__caret { transform: translateY(1px) rotate(225deg); }
+.tagfilter__panel { position: absolute; top: calc(100% + var(--space-2xs)); left: 0; z-index: var(--z-dropdown); width: max-content; max-width: min(36rem, calc(100vw - 2 * var(--gutter))); display: grid; gap: var(--space-sm); padding: var(--space-sm); border: var(--rule-hair) solid var(--color-rule-2); border-radius: var(--radius-card); background: var(--color-paper-2); }
+.tagfilter__empty { max-width: 28ch; color: var(--color-muted); font-size: var(--text-sm); }
+.tagfilter__clear { justify-self: start; min-height: 32px; padding-inline: var(--space-xs); border: 0; background: none; color: var(--color-muted); font-size: var(--text-sm); text-decoration: underline; cursor: pointer; }
+.tagfilter__clear:hover { color: var(--color-ink); }
 
 .ledger { width: 100%; border-collapse: collapse; }
 .ledger th { padding: var(--space-xs) var(--space-md); text-align: left; font-size: var(--text-sm); font-weight: 500; color: var(--color-muted); white-space: nowrap; border-bottom: var(--rule-hair) solid var(--color-rule); }
