@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { AuthButton } from "./auth-button";
 
 const LINKS = [
-  { href: "/", label: "Issues" },
+  { href: "/dashboard", label: "Issues" },
   { href: "/about", label: "About" },
 ];
 
@@ -15,7 +15,7 @@ export function Navbar() {
   return (
     <header className="topbar">
       <div className="container topbar__inner">
-        <Link href="/" className="wordmark" aria-label="Issue Tracker home">
+        <Link href="/dashboard" className="wordmark" aria-label="Issue Tracker home">
           Issue Tracker
         </Link>
         <nav className="topbar__links" aria-label="Primary">

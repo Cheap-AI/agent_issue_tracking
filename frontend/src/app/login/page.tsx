@@ -12,7 +12,7 @@ export default function LoginPage() {
 
   // After the Google redirect lands back here with a session, go home.
   useEffect(() => {
-    if (session) router.replace("/");
+    if (session) router.replace("/dashboard");
   }, [session, router]);
 
   const signInWithGoogle = async () => {
