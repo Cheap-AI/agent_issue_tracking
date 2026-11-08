@@ -31,6 +31,10 @@ from backend.models import db_models  # noqa: F401  (ensures models are register
 ALLOW_DB_TESTS = os.environ.get("ALLOW_DB_TESTS") == "1"
 
 
+def pytest_configure(config):
+    config.addinivalue_line("markers", "no_db: test never touches the database; runs without ALLOW_DB_TESTS")
+
+
 def pytest_collection_modifyitems(config, items):
     if ALLOW_DB_TESTS:
         return
@@ -39,6 +43,8 @@ def pytest_collection_modifyitems(config, items):
         "database from accidental writes - see tests/conftest.py)."
     )
     for item in items:
+        if item.get_closest_marker("no_db"):
+            continue  # pure-logic tests never touch the database
         item.add_marker(skip_db)
 
 

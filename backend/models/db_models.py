@@ -44,7 +44,10 @@ class Issue(Base):
     title: Mapped[str] = mapped_column(Text, nullable=False)
     summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
     why: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)  # union of the three below
+    geography: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    topics: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    affected_groups: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     target_year: Mapped[int | None] = mapped_column(nullable=True)
     target_month: Mapped[int | None] = mapped_column(nullable=True)

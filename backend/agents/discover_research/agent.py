@@ -16,7 +16,7 @@ from typing import Any
 from backend.core.llm import bulk_model, get_bulk_client, tool_message_content
 from langfuse import get_client
 
-from backend.core.issue import get_issue, list_issues
+from backend.core.issue import get_issue, get_tag_vocabulary, list_issues
 from backend.services import search_service
 from backend.services import exa_service
 from backend.services.vector_search import search_similar_issues_by_text
@@ -42,6 +42,10 @@ You do NOT write anything to the database yourself - these tools only draft a pr
 human will review later. Be thorough with research before drafting: a thin, generic dossier
 will be rejected by a quality reviewer and sent back to you with feedback.
 
+Tag the draft in three separate spaces: `geography` (where), `topics` (what kind of issue) and
+`affected_groups` (who, e.g. parents, students, seniors; may be empty). Call `get_tag_vocabulary`
+first and reuse existing values when they fit, so the same group is not spelled two ways.
+
 Call `collect_events` at least once to gather timestamped events before drafting, when relevant.
 """
 
@@ -64,6 +68,10 @@ def _tool_search_exa(query: str) -> dict[str, Any]:
 
 def _tool_list_issues() -> dict[str, Any]:
     return {"issues": list_issues()}
+
+
+def _tool_get_tag_vocabulary() -> dict[str, Any]:
+    return get_tag_vocabulary()
 
 
 def _tool_get_issue(issue_id: str) -> dict[str, Any]:
@@ -121,7 +129,9 @@ def _tool_draft_create_issue(
     title: str,
     summary: str,
     why: str,
-    tags: list[str] | None,
+    geography: list[str] | None,
+    topics: list[str] | None,
+    affected_groups: list[str] | None,
     research_dossier: str,
 ) -> dict[str, Any]:
     return {
@@ -131,7 +141,9 @@ def _tool_draft_create_issue(
             "title": title,
             "summary": summary,
             "why": why,
-            "tags": tags or [],
+            "geography": geography or [],
+            "topics": topics or [],
+            "affected_groups": affected_groups or [],
             "research_dossier": research_dossier,
         },
     }
@@ -177,6 +189,14 @@ TOOLS = [
                 "properties": {"query": {"type": "string"}},
                 "required": ["query"],
             },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_tag_vocabulary",
+            "description": "List the tag values already used in each space (geography, topics, affected_groups) with counts. Call this before drafting or creating and reuse existing values when they fit; add a new value only when none do.",
+            "parameters": {"type": "object", "properties": {}},
         },
     },
     {
@@ -240,7 +260,9 @@ TOOLS = [
                     "title": {"type": "string"},
                     "summary": {"type": "string"},
                     "why": {"type": "string"},
-                    "tags": {"type": "array", "items": {"type": "string"}},
+                    "geography": {"type": "array", "items": {"type": "string"}, "description": "Where the issue plays out: countries or regions, or 'global'. Reuse spellings from get_tag_vocabulary, e.g. ['Africa', 'U.S.']."},
+                    "topics": {"type": "array", "items": {"type": "string"}, "description": "What kind of issue it is, e.g. ['health', 'economy', 'policy']. Reuse existing topics from get_tag_vocabulary where they fit."},
+                    "affected_groups": {"type": "array", "items": {"type": "string"}, "description": "Who is affected, e.g. ['parents', 'students', 'seniors']. Reuse existing values from get_tag_vocabulary; may be empty."},
                     "research_dossier": {
                         "type": "string",
                         "description": "Consolidated research findings: evidence, context, and sources gathered for this issue.",
@@ -280,6 +302,8 @@ def _dispatch_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         return _tool_list_issues()
     if name == "get_issue":
         return _tool_get_issue(arguments["issue_id"])
+    if name == "get_tag_vocabulary":
+        return _tool_get_tag_vocabulary()
     if name == "check_similar_issues":
         return _tool_check_similar_issues(arguments["candidate_text"], int(arguments.get("top_k", 5)))
     if name == "collect_events":
@@ -289,7 +313,9 @@ def _dispatch_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             arguments["title"],
             arguments["summary"],
             arguments.get("why", ""),
-            arguments.get("tags"),
+            arguments.get("geography"),
+            arguments.get("topics"),
+            arguments.get("affected_groups"),
             arguments.get("research_dossier", ""),
         )
     if name == "draft_merge_issue":

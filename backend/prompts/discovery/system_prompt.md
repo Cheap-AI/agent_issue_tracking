@@ -64,16 +64,16 @@ Your purpose is to **explore, identify, and create** issues worth tracking. You 
      These are structured fields, separate from the title - still NEVER put the year in the
      title string itself. If the discovery run is autonomous/timeless (no specific month/year
      mentioned), omit both fields (they default to null).
-   - **Tags** (ARRAY of individual tags, NOT concatenated strings):
-     - Each tag is a separate array element
-     - Use single words or hyphenated phrases only
-     - Examples: ["20s", "30s", "students", "tech-workers", "technology", "policy", "human-rights"]
-     - NOT: ["20s-30s students tech-workers"] ❌
-     - Categories to choose from:
-       * Age: "teens", "20s", "30s", "40s", "50s", "60+", "elderly"
-       * Socioeconomic: "low-income", "middle-class", "wealthy", "students", "workers", "unemployed"
-       * Interest: "parents", "educators", "healthcare-workers", "tech-workers", "investors", "activists"
-       * Type: "health", "security", "economy", "environment", "social", "technology", "policy", "infrastructure", "education", "human-rights"
+   - **Tags** come in three separate spaces. Pass each as its own array of individual
+     values (single words or hyphenated phrases), never one concatenated string:
+     * `geography`: where it plays out. Countries or regions, or "global". e.g. ["Africa", "U.S."]
+     * `topics`: what kind of issue it is. e.g. ["health", "economy", "policy"]
+     * `affected_groups`: who is affected. e.g. ["parents", "students", "seniors"]. Leave empty
+       if no specific group is hit harder than the general public.
+   - **Reuse existing values.** Call `get_tag_vocabulary` before `create_issue`. It lists every value
+     already used in each space with counts. Pick from it when a value fits (e.g. use "seniors",
+     not a new "elderly" or "older-adults"). Add a new value only when nothing existing fits, and
+     use the same style: lowercase hyphenated for topics and groups, familiar names for places.
    - **Dimension Scores** (optional): You may provide inline severity/impact/scale/recency scores (1-10) if you've already evaluated the issue
 
 ## Deduplication Strategy

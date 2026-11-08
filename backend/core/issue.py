@@ -9,6 +9,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.core.db import get_session
+from backend.core.tags import (
+    SPACES,
+    canonicalize,
+    split_legacy_tags,
+    union_tags,
+    vocabulary_from_rows,
+)
 from backend.models.db_models import Event, Issue, issue_id_seq
 
 COMPONENTS = ("research", "summary", "timeline", "sources", "questions")
@@ -25,6 +32,9 @@ def _issue_to_dict(issue: Issue) -> dict[str, Any]:
         "summary": issue.summary,
         "why": issue.why,
         "tags": issue.tags or [],
+        "geography": issue.geography or [],
+        "topics": issue.topics or [],
+        "affected_groups": issue.affected_groups or [],
         "is_active": issue.is_active,
         "target_year": issue.target_year,
         "target_month": issue.target_month,
@@ -50,9 +60,29 @@ def create_issue(
     target_year: int | None = None,
     target_month: int | None = None,
     session: Session | None = None,
+    geography: list[str] | None = None,
+    topics: list[str] | None = None,
+    affected_groups: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Create a new issue row. Returns the issue as a dict."""
+    """Create a new issue row. Returns the issue as a dict.
+
+    Tags go into three spaces. Legacy flat ``tags`` are sorted into spaces for callers that
+    have not moved over yet. Values are matched to existing spellings (case-insensitive).
+    """
     def _create(db: Session) -> dict[str, Any]:
+        requested = {
+            "geography": list(geography or []),
+            "topics": list(topics or []),
+            "affected_groups": list(affected_groups or []),
+        }
+        for space, values in split_legacy_tags(tags).items():
+            requested[space].extend(values)
+        existing = get_tag_vocabulary(db)
+        clean = {
+            space: canonicalize(requested[space], [v["value"] for v in existing[space]])
+            for space in SPACES
+        }
+
         next_number = db.execute(select(issue_id_seq.next_value())).scalar_one()
         new_id = f"iss-{next_number:04d}"
 
@@ -61,7 +91,10 @@ def create_issue(
             title=title.strip(),
             summary=summary.strip(),
             why=why.strip(),
-            tags=tags or [],
+            tags=union_tags(clean["geography"], clean["topics"], clean["affected_groups"]),
+            geography=clean["geography"],
+            topics=clean["topics"],
+            affected_groups=clean["affected_groups"],
             is_active=True,
             target_year=target_year,
             target_month=target_month,
@@ -72,6 +105,17 @@ def create_issue(
         return _issue_to_dict(issue)
 
     return _run_with_session(session, _create)
+
+
+def get_tag_vocabulary(session: Session | None = None) -> dict[str, list[dict[str, Any]]]:
+    """Values already in use per tag space, most used first: {space: [{value, count}]}."""
+    def _vocab(db: Session) -> dict[str, list[dict[str, Any]]]:
+        rows = db.execute(select(Issue.geography, Issue.topics, Issue.affected_groups)).all()
+        return vocabulary_from_rows(
+            {"geography": g, "topics": t, "affected_groups": a} for g, t, a in rows
+        )
+
+    return _run_with_session(session, _vocab)
 
 
 def list_issues(

@@ -178,7 +178,9 @@ def persist_node(state: PipelineState) -> dict[str, Any]:
                 title=candidate.get("title", ""),
                 summary=summary_draft.get("summary", ""),
                 why=candidate.get("why", ""),
-                tags=candidate.get("tags", []),
+                geography=candidate.get("geography", []),
+                topics=candidate.get("topics", []),
+                affected_groups=candidate.get("affected_groups", []),
             )
             issue_id = issue["id"]
             update_component(issue_id, "research", candidate.get("research_dossier", ""))

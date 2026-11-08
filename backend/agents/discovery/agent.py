@@ -17,7 +17,7 @@ from typing import Any
 from backend.core.llm import bulk_model, get_bulk_client, load_prompt, tool_message_content
 from langfuse import get_client
 
-from backend.core.issue import create_issue, get_issue, list_issues
+from backend.core.issue import create_issue, get_issue, get_tag_vocabulary, list_issues
 from backend.services import search_service
 from backend.services import exa_service
 from backend.services.vector_search import search_similar_issues_by_text, store_issue_embedding
@@ -79,6 +79,11 @@ def _tool_list_issues() -> dict[str, Any]:
     return {"issues": list_issues()}
 
 
+# Shows the tag values already in use per space so new issues reuse them.
+def _tool_get_tag_vocabulary() -> dict[str, Any]:
+    return get_tag_vocabulary()
+
+
 # Fetches a specific issue by id for deeper comparison.
 def _tool_get_issue(issue_id: str) -> dict[str, Any]:
     issue = get_issue(issue_id)
@@ -93,7 +98,9 @@ def _tool_create_issue(
     title: str, 
     summary: str, 
     why: str = "", 
-    tags: list[str] | None = None,
+    geography: list[str] | None = None,
+    topics: list[str] | None = None,
+    affected_groups: list[str] | None = None,
     dimension_scores: dict[str, int] | None = None,
     target_year: int | None = None,
     target_month: int | None = None,
@@ -102,7 +109,9 @@ def _tool_create_issue(
         title=title,
         summary=summary,
         why=why,
-        tags=tags or [],
+        geography=geography,
+        topics=topics,
+        affected_groups=affected_groups,
         target_year=target_year,
         target_month=target_month,
     )
@@ -226,6 +235,14 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "get_tag_vocabulary",
+            "description": "List the tag values already used in each space (geography, topics, affected_groups) with counts. Call this before drafting or creating and reuse existing values when they fit; add a new value only when none do.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_issue",
             "description": "Inspect a specific issue by id.",
             "parameters": {
@@ -294,10 +311,20 @@ TOOLS = [
                     "title": {"type": "string"},
                     "summary": {"type": "string"},
                     "why": {"type": "string"},
-                    "tags": {
+                    "geography": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "Array of individual tags (single words or hyphenated phrases). Each tag is a separate array element. Example: ['20s', '30s', 'students', 'tech-workers', 'technology', 'policy', 'human-rights']. Categories: age (teens, 20s, 30s, 40s, 50s, 60+, elderly), socioeconomic (low-income, middle-class, wealthy, students, workers, unemployed), interest (parents, educators, healthcare-workers, tech-workers, investors, activists), type (health, security, economy, environment, social, technology, policy, infrastructure, education, human-rights)"
+                        "description": "Where the issue plays out: countries or regions, or 'global'. Reuse spellings from get_tag_vocabulary, e.g. ['Africa', 'U.S.'].",
+                    },
+                    "topics": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "What kind of issue it is, e.g. ['health', 'economy', 'policy']. Reuse existing topics from get_tag_vocabulary where they fit.",
+                    },
+                    "affected_groups": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Who is affected, e.g. ['parents', 'students', 'seniors']. Reuse existing values from get_tag_vocabulary; may be empty.",
                     },
                     "dimension_scores": {
                         "type": "object",
@@ -357,6 +384,8 @@ def _dispatch_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             arguments["candidate_text"],
             int(arguments.get("top_k", 5))
         )
+    if name == "get_tag_vocabulary":
+        return _tool_get_tag_vocabulary()
     if name == "merge_into_issue":
         return _tool_merge_into_issue(
             arguments["issue_id"],
@@ -368,7 +397,9 @@ def _dispatch_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             arguments["title"], 
             arguments["summary"], 
             arguments.get("why", ""),
-            arguments.get("tags"),
+            arguments.get("geography"),
+            arguments.get("topics"),
+            arguments.get("affected_groups"),
             arguments.get("dimension_scores"),
             arguments.get("target_year"),
             arguments.get("target_month"),
@@ -443,7 +474,7 @@ def discover_issues(
                 "- Start by listing current issues to understand gaps\n"
                 "- Search for new candidates that are distinct\n"
                 "- Issues should be relevant to people's lives (not necessarily global)\n"
-                "- When creating issues, include relevant tags for affected groups and issue type\n"
+                "- Before create_issue, call get_tag_vocabulary and reuse existing geography, topics and affected_groups values where they fit\n"
                 "- Provide evidence-based 'why' for each created issue"
             ),
         },

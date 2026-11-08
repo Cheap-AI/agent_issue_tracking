@@ -5,7 +5,10 @@ class IssueCreateRequest(BaseModel):
     title: str
     summary: str
     why: str = ""
-    tags: list[str] = []
+    tags: list[str] = []  # legacy flat tags, sorted into spaces server-side
+    geography: list[str] = []
+    topics: list[str] = []
+    affected_groups: list[str] = []
     target_year: int | None = None
     target_month: int | None = None
 
