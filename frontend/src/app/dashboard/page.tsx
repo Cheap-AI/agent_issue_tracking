@@ -200,12 +200,15 @@ function LeaderboardPanel({ entries }: { entries: LeaderboardEntry[] }) {
   );
 }
 
+const PAGE_SIZE = 20;
+
 export default function Home() {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [tagSelection, setTagSelection] = useState<TagSelection>(EMPTY_SELECTION);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const searchId = useId();
 
   const apiBaseUrl = useMemo(() => getApiBaseUrl(), []);
@@ -296,11 +299,18 @@ export default function Home() {
               className="input"
               placeholder="Search issues…"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setVisibleCount(PAGE_SIZE);
+              }}
             />
 
             {issues.length > 0 && (
-              <TagFilter issues={issues} selection={tagSelection} onChange={setTagSelection} />
+              <TagFilter issues={issues} selection={tagSelection} onChange={(next) => {
+                  setTagSelection(next);
+                  setVisibleCount(PAGE_SIZE);
+                }}
+              />
             )}
           </div>
 
@@ -317,7 +327,7 @@ export default function Home() {
                   <th scope="col" className="ledger__score">Score</th>
                 </tr>
               </thead>
-              {filteredIssues.slice(0, 20).map((issue) => (
+              {filteredIssues.slice(0, visibleCount).map((issue) => (
                 <IssueRow
                   key={issue.id}
                   issue={issue}
@@ -327,6 +337,16 @@ export default function Home() {
               ))}
             </table>
           )}
+
+          {filteredIssues.length > visibleCount ? (
+            <button
+              type="button"
+              className="tagfilter__clear"
+              onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}
+            >
+              Show more ({filteredIssues.length - visibleCount} remaining)
+            </button>
+          ) : null}
         </section>
 
         <LeaderboardPanel entries={leaderboard} />

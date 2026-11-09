@@ -35,6 +35,10 @@ def _issue_to_dict(issue: Issue) -> dict[str, Any]:
         "geography": issue.geography or [],
         "topics": issue.topics or [],
         "affected_groups": issue.affected_groups or [],
+        "origin_year": issue.origin_year,
+        "origin_precision": issue.origin_precision,
+        "origin_confidence": issue.origin_confidence,
+        "origin_basis": issue.origin_basis,
         "is_active": issue.is_active,
         "target_year": issue.target_year,
         "target_month": issue.target_month,
@@ -105,6 +109,29 @@ def create_issue(
         return _issue_to_dict(issue)
 
     return _run_with_session(session, _create)
+
+
+def set_issue_origin(
+    issue_id: str,
+    origin_year: int | None,
+    origin_precision: str | None,
+    origin_confidence: str | None,
+    origin_basis: str | None,
+    session: Session | None = None,
+) -> dict[str, Any] | None:
+    """Store an (already validated) origin estimate. Returns the issue dict, or None if not found."""
+    def _set(db: Session) -> dict[str, Any] | None:
+        issue = db.get(Issue, issue_id)
+        if issue is None:
+            return None
+        issue.origin_year = origin_year
+        issue.origin_precision = origin_precision
+        issue.origin_confidence = origin_confidence
+        issue.origin_basis = origin_basis
+        db.flush()
+        return _issue_to_dict(issue)
+
+    return _run_with_session(session, _set)
 
 
 def get_tag_vocabulary(session: Session | None = None) -> dict[str, list[dict[str, Any]]]:

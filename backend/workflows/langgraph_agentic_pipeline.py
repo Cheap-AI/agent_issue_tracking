@@ -23,8 +23,9 @@ from backend.agents.discover_research.agent import discover_and_research
 from backend.agents.judge.agent import judge_research, judge_summary
 from backend.agents.ranking.agent import upsert_tracked_issue
 from backend.agents.summarize_rank.agent import summarize_and_rank
-from backend.core.issue import create_issue
+from backend.core.issue import create_issue, set_issue_origin
 from backend.core.knowledge import update_component
+from backend.services.origin import estimate_origin
 from backend.workflows.collect_events import save_events_to_db
 
 langfuse = get_client()
@@ -163,6 +164,13 @@ def route_after_human_review(state: PipelineState) -> Literal["persist", "reject
     return "persist" if state.get("human_decision") == "approve" else "rejected"
 
 
+def _store_origin(issue_id: str, title: str, summary: str, why: str, research: str, events: list) -> None:
+    """Best effort: estimate when the problem began. A failure leaves the columns NULL."""
+    origin = estimate_origin(title, summary, why, research=research, events=events)
+    if origin is not None:
+        set_issue_origin(issue_id, **origin)
+
+
 # Only node that writes to the database - runs after human approval.
 def persist_node(state: PipelineState) -> dict[str, Any]:
     candidate = (state["research_draft"] or {}).get("candidate") or {}
@@ -184,6 +192,14 @@ def persist_node(state: PipelineState) -> dict[str, Any]:
             )
             issue_id = issue["id"]
             update_component(issue_id, "research", candidate.get("research_dossier", ""))
+            _store_origin(
+                issue_id,
+                issue["title"],
+                issue["summary"],
+                issue["why"],
+                candidate.get("research_dossier", ""),
+                events,
+            )
 
         if events:
             save_events_to_db(issue_id, events)

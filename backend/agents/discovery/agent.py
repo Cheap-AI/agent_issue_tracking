@@ -17,7 +17,8 @@ from typing import Any
 from backend.core.llm import bulk_model, get_bulk_client, load_prompt, tool_message_content
 from langfuse import get_client
 
-from backend.core.issue import create_issue, get_issue, get_tag_vocabulary, list_issues
+from backend.core.issue import create_issue, get_issue, get_tag_vocabulary, list_issues, set_issue_origin
+from backend.services.origin import estimate_origin
 from backend.services import search_service
 from backend.services import exa_service
 from backend.services.vector_search import search_similar_issues_by_text, store_issue_embedding
@@ -118,6 +119,11 @@ def _tool_create_issue(
     
     # Store embedding for future deduplication
     store_issue_embedding(issue_id=issue["id"], title=title, summary=summary, why=why)
+
+    # Best effort: when did the problem begin? Leaves the columns NULL if estimation fails.
+    origin = estimate_origin(title, summary, why)
+    if origin is not None:
+        issue = set_issue_origin(issue["id"], **origin) or issue
     
     # Score if dimensions not provided (agent may provide inline scores from merged logic)
     if dimension_scores:

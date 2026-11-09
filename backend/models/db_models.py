@@ -48,6 +48,11 @@ class Issue(Base):
     geography: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     topics: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     affected_groups: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    # When the problem itself began (not when we found it). NULL = not estimated yet.
+    origin_year: Mapped[int | None] = mapped_column(nullable=True)  # negative = BCE
+    origin_precision: Mapped[str | None] = mapped_column(Text, nullable=True)  # year|decade|century|era|unknown
+    origin_confidence: Mapped[str | None] = mapped_column(Text, nullable=True)  # low|medium|high
+    origin_basis: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     target_year: Mapped[int | None] = mapped_column(nullable=True)
     target_month: Mapped[int | None] = mapped_column(nullable=True)

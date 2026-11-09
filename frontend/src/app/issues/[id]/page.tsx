@@ -10,6 +10,10 @@ type Issue = {
   summary: string;
   why?: string;
   tags?: string[];
+  origin_year?: number | null;
+  origin_precision?: string | null;
+  origin_confidence?: string | null;
+  origin_basis?: string | null;
   is_active?: boolean;
   created_at?: string;
 };
@@ -27,6 +31,18 @@ const getApiBaseUrl = () => {
   // In production, use the full backend URL (e.g., https://backend.com/api)
   // In development, use /api which is proxied to localhost:8000
   return process.env.NEXT_PUBLIC_API_BASE_URL || "/api";
+};
+
+/** "Began in the 1940s" etc. Returns null when no estimate has been made yet. */
+const describeOrigin = (issue: Issue): string | null => {
+  const { origin_year: year, origin_precision: precision } = issue;
+  if (!precision) return null;
+  if (precision === "unknown" || year == null) return "Origin unknown";
+  const label = (y: number) => (y < 0 ? `${-y} BCE` : String(y));
+  if (precision === "year") return `Began in ${label(year)}`;
+  if (precision === "decade") return `Began in the ${label(year)}s`;
+  if (precision === "century") return `Began around ${label(year)}`;
+  return `Roots around ${label(year)}`;
 };
 
 const hostOf = (url: string) => {
@@ -121,6 +137,15 @@ export default function IssueDetailPage() {
                     </li>
                   ))}
                 </ul>
+              ) : null}
+              {describeOrigin(issue) ? (
+                <p className="detail__origin muted">
+                  <span className="measured">{describeOrigin(issue)}</span>
+                  {issue.origin_precision !== "unknown" && issue.origin_confidence
+                    ? ` (estimated, ${issue.origin_confidence} confidence)`
+                    : null}
+                  {issue.origin_basis ? `. ${issue.origin_basis}` : null}
+                </p>
               ) : null}
             </header>
 
